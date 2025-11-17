@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Sample annotated chess game"
-date:   2025-11-18
+date:   2025-11-11
 ---
 
 Lorem ipsizzle funky fresh i'm in the shizzle boom shackalack, consectetizzle adipiscing my shizz. Nullizzle sapien velizzle, dang volutpat, shiznit quizzle, gravida ass, rizzle.
