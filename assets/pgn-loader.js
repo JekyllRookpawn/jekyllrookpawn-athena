@@ -39,28 +39,9 @@ async function renderPGN() {
     movesOnly = movesOnly.replace(/\[%.*?\]/g, ''); // remove engine tags
     movesOnly = movesOnly.replace(/\{\s*\}/g, ''); // remove empty braces
 
-    // Split by move numbers
-    const moveChunks = movesOnly.split(/\s*(\d+\.)\s*/).filter(s => s.trim() !== '');
+    // Split all tokens: move numbers, moves, annotations
+    const tokens = movesOnly.match(/(\d+\.)|(\{[^}]*\})|(\S+)/g);
 
     let movesText = '';
-    for (let i = 0; i < moveChunks.length; i += 2) {
-        const moveNumber = moveChunks[i].replace('.', '');
-        const moves = moveChunks[i + 1] ? moveChunks[i + 1].trim() : '';
-        if (moves) {
-            movesText += `${moveNumber}. ${moves} `;
-        }
-    }
-
-    movesText = movesText.trim();
-
-    // Append game result at the end
-    if (tags.Result) {
-        movesText += ` ${tags.Result}`;
-    }
-
-    // Output into three paragraphs: header, event, moves with annotations
-    const container = document.getElementById('pgn-output');
-    container.innerHTML = `<p>${headerLine}</p><p>${eventLine}</p><p>${movesText}</p>`;
-}
-
-document.addEventListener('DOMContentLoaded', renderPGN);
+    let moveNumber = 1;
+    for (let i = 0; i < tokens.len
