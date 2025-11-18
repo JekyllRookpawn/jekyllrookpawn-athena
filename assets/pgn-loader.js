@@ -1,5 +1,5 @@
-// Basic PGN loader + parser + renderer
-// This script loads a PGN file via <link rel="pgn" href="game.pgn"> and renders moves as text.
+// PGN loader + parser + renderer (clean full version)
+// Loads a PGN file via <link rel=\"pgn\" href=\"game.pgn\"> and renders selected headers.
 
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
@@ -16,14 +16,14 @@ async function loadPGN() {
 }
 
 function parsePGN(pgnText) {
-  const lines = pgnText.split(/\r?\n/);
+  const lines = pgnText.split(/\\r?\\n/);
   const tags = {};
   let moves = [];
   let inHeader = true;
 
   for (const line of lines) {
     if (inHeader && line.startsWith('[')) {
-      const match = line.match(/^\[(\w+)\s+"(.*)"\]$/);
+      const match = line.match(/^\\[(\\w+)\\s+\"(.*)\"\\]$/);
       if (match) tags[match[1]] = match[2];
     } else {
       inHeader = false;
@@ -31,7 +31,7 @@ function parsePGN(pgnText) {
     }
   }
 
-  const moveText = moves.join(' ').replace(/\s+/g, ' ').trim();
+  const moveText = moves.join(' ').replace(/\\s+/g, ' ').trim();
   return { tags, moveText };
 }
 
@@ -39,15 +39,19 @@ function renderPGN(parsed) {
   const container = document.getElementById('pgn-output');
   if (!container) return;
 
-  // Display tags
+  const allowed = new Set([
+    'Event', 'Date', 'White', 'Black',
+    'WhiteElo', 'BlackElo', 'WhiteTitle', 'BlackTitle'
+  ]);
+
   let html = '';
   for (const [key, value] of Object.entries(parsed.tags)) {
-    html += `<div><strong>${key}:</strong> ${value}</div>`;
+    if (allowed.has(key)) {
+      html += `<div><strong>${key}:</strong> ${value}</div>`;
+    }
   }
 
-  // Display moves
   html += `<pre>${parsed.moveText}</pre>`;
-
   container.innerHTML = html;
 }
 
