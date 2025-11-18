@@ -1,5 +1,5 @@
 // PGN loader + parser + renderer using chess.js
-// Only engine/clock tags [%eval ...] [%clk ...] are removed; other comments are preserved
+// Engine/clock tags [%eval ...] [%clk ...] are removed; other comments preserved and shown next to moves
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -28,7 +28,22 @@ function buildHeader(tags) {
     return { headerLine, eventLine };
 }
 
-function buildMovesText(chess) {
+function extractAnnotations(pgnText) {
+    const annotationMap = {};
+    // Match all moves with optional {…} comments
+    const regex = /(\d+\.\s*\S+|\.\.\.\s*\S+)(\s*\{[^}]*\})?/g;
+    let match, moveIndex = 0;
+
+    while ((match = regex.exec(pgnText)) !== null) {
+        const comment = match[2]?.trim() || '';
+        if (comment) annotationMap[moveIndex] = comment;
+        moveIndex++;
+    }
+
+    return annotationMap;
+}
+
+function buildMovesText(chess, annotationMap) {
     const history = chess.history({ verbose: true });
     let movesText = '';
 
@@ -37,8 +52,11 @@ function buildMovesText(chess) {
         const whiteMove = history[i]?.san || '';
         const blackMove = history[i + 1]?.san || '';
 
-        movesText += `${moveNumber}. ${whiteMove}`;
-        if (blackMove) movesText += ` ${blackMove} `;
+        const whiteAnn = annotationMap[i] ? ' ' + annotationMap[i] : '';
+        const blackAnn = annotationMap[i + 1] ? ' ' + annotationMap[i + 1] : '';
+
+        movesText += `${moveNumber}. ${whiteMove}${whiteAnn}`;
+        if (blackMove) movesText += ` ${blackMove}${blackAnn} `;
         else movesText += ' ';
     }
 
@@ -52,7 +70,7 @@ async function renderPGN() {
     let pgnText = await loadPGN();
     if (!pgnText) return;
 
-    // Only remove engine/clock tags, keep other annotations
+    // Remove only engine/clock tags, keep other comments
     pgnText = removeEngineClockTags(pgnText);
 
     const chess = new Chess();
@@ -63,7 +81,8 @@ async function renderPGN() {
 
     const tags = chess.header();
     const { headerLine, eventLine } = buildHeader(tags);
-    const movesText = buildMovesText(chess);
+    const annotationMap = extractAnnotations(pgnText);
+    const movesText = buildMovesText(chess, annotationMap);
 
     const container = document.getElementById('pgn-output');
     container.textContent = `${headerLine}\n${eventLine}\n${movesText}`;
