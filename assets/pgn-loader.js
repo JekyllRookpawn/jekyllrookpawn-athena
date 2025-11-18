@@ -1,9 +1,3 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
-
-<link rel="pgn" href="game.pgn">
-<div id="pgn-output"></div>
-
-<script>
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
   if (!link || !link.href) return null;
@@ -50,4 +44,8 @@ async function renderPGN() {
   movesText = movesText.trim();
 
   // Output into two paragraphs
-  const co
+  const container = document.getElementById('pgn-output');
+  container.innerHTML = `<p>${headInfo}</p><p>${movesText}</p>`;
+}
+
+document.addEventListener('DOMContentLoaded', renderPGN);
