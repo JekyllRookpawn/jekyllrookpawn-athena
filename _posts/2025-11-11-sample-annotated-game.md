@@ -1,11 +1,13 @@
 ---
 layout: post
-title:  "Sample annotated chess game"
+title:  "Sample annotated game"
 date:   2025-11-11
 ---
 
-### Marius Gramb (2142) - GM Bogdan-Daniel Deac (2690)
-**Reykjavik Open, 2024.03.15**
+Here's a sample annotated game in text with diagrams generated using Lichess' fen to gif export.
+
+## Marius Gramb (2142) - GM Bogdan-Daniel Deac (2690)
+### Reykjavik Open, 2024.03.15
 
 1\. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 e6 6. Na3 Qd8
 
