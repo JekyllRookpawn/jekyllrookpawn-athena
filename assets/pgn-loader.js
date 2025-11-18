@@ -1,5 +1,5 @@
 // PGN loader + renderer using chess.js
-// Header formatted on two lines with <p>, moves preserve comments but remove engine/clock tags
+// Header formatted on two lines with <p>, moves preserve comments except engine/clock/cal tags
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -37,8 +37,8 @@ function extractMovesOnly(pgnText) {
     let movesLines = lines.filter(line => !line.startsWith('['));
     let movesText = movesLines.join(' ').trim();
 
-    // Remove engine/clock comments: { [%eval ...] [%clk ...] }
-    movesText = movesText.replace(/\{\s*(\[%eval.*?\]|\[%clk.*?\])+\s*\}/g, '').trim();
+    // Remove engine/clock/cal tags: { [%eval ...] }, { [%clk ...] }, { [%cal ...] }
+    movesText = movesText.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
 
     return movesText;
 }
