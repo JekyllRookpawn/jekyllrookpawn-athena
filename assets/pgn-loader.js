@@ -42,7 +42,14 @@ async function renderPGN() {
     let match;
     let moveIndex = 0;
     while ((match = moveAnnotationRegex.exec(pgnText)) !== null) {
-        if (match[2] && /[A-Za-z]/.test(match[2])) annotationMap[moveIndex] = match[2].trim();
+        if (match[2]) {
+            // Remove any engine/clock tags inside the annotation (e.g. [%eval ...], [%clk ...])
+            const annInner = match[2].replace(/\[%.*?\]/g, '').replace(/[\{\}]/g, '').trim();
+            // Keep annotation if it contains letters, digits, or common annotation symbols (! ? # + =)
+            if (annInner && /[A-Za-z0-9!\?\#\+=]/.test(annInner)) {
+                annotationMap[moveIndex] = '{' + annInner + '}';
+            }
+        }
         moveIndex++;
     }
 
@@ -66,7 +73,7 @@ async function renderPGN() {
     movesText += ` ${tags.Result || '*'}`;
 
     const container = document.getElementById('pgn-output');
-    container.innerHTML = `<p>${headerLine}</p><p>${eventLine}</p><p>${movesText}</p>`;
+    container.innerHTML = `<p>${headerLine}<br>${eventLine}</p><p>${movesText}</p>`;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
