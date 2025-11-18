@@ -1,6 +1,6 @@
 // PGN loader + renderer using chess.js
 // Preserve all moves, comments, and engine/clock tags
-// Header includes titles, names, Elo, site, and date
+// Header formatted on two lines
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -27,10 +27,10 @@ function buildHeader(tags) {
 
     const white = formatPlayer(tags.WhiteTitle, tags.White, tags.WhiteElo);
     const black = formatPlayer(tags.BlackTitle, tags.Black, tags.BlackElo);
-    const headerLine = `${white} - ${black}`;
-    const eventLine = [tags.Site, tags.Date].filter(Boolean).join(', ');
+    const siteDate = [tags.Site, tags.Date].filter(Boolean).join(', ');
 
-    return `${headerLine}\n${eventLine}`;
+    // Two lines: first line = players, second line = site/date
+    return `${white} - ${black}\n${siteDate}`;
 }
 
 async function renderPGN() {
@@ -50,7 +50,8 @@ async function renderPGN() {
     const movesText = chess.pgn();
 
     const container = document.getElementById('pgn-output');
-    container.textContent = `${header}\n${movesText}`;
+    // Put a line break between header and moves
+    container.textContent = `${header}\n\n${movesText}`;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
