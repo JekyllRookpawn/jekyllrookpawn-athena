@@ -1,7 +1,7 @@
 ---
 layout: category-post
 title:  "Sample diagrams"
-date:   2019-11-11
+date:   2020-11-11
 categories: writing
 ---
 
