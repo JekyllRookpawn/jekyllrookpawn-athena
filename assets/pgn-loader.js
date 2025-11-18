@@ -34,24 +34,30 @@ async function renderPGN() {
     const headerLine = `${whitePart} - ${blackPart}`;
     const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
 
-    // 2. Render moves with move numbers
-    const movesArray = chess.history();
+    // Parse PGN moves including annotations
     let movesText = '';
-    for (let i = 0; i < movesArray.length; i += 2) {
-        const moveNumber = Math.floor(i / 2) + 1;
-        const whiteMove = movesArray[i];
-        const blackMove = movesArray[i + 1] ? ' ' + movesArray[i + 1] : '';
-        movesText += `${moveNumber}. ${whiteMove}${blackMove} `;
+    let movesOnly = pgnText.replace(/^\[.*\]\s*$/gm, '').trim(); // remove headers
+    movesOnly = movesOnly.replace(/\[%.*?\]/g, ''); // remove engine tags like [%eval], [%clk]
+
+    // Split moves by move numbers
+    const moveChunks = movesOnly.split(/\s*(\d+\.)\s*/).filter(s => s.trim() !== '');
+
+    for (let i = 0; i < moveChunks.length; i += 2) {
+        const moveNumber = moveChunks[i].replace('.', '');
+        const moves = moveChunks[i + 1] ? moveChunks[i + 1].trim() : '';
+        if (moves) {
+            movesText += `${moveNumber}. ${moves} `;
+        }
     }
 
     movesText = movesText.trim();
 
-    // Append the game result at the end
+    // Append game result at the end
     if (tags.Result) {
         movesText += ` ${tags.Result}`;
     }
 
-    // Output into two paragraphs
+    // Output into three paragraphs: header, event, moves with annotations
     const container = document.getElementById('pgn-output');
     container.innerHTML = `<p>${headerLine}</p><p>${eventLine}</p><p>${movesText}</p>`;
 }
