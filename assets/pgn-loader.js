@@ -1,4 +1,3 @@
-<script>
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
   if (!link || !link.href) return null;
@@ -13,7 +12,7 @@ async function loadPGN() {
   }
 }
 
-async function parseAndRenderPGN() {
+async function renderMoves() {
   const pgnText = await loadPGN();
   if (!pgnText) return;
 
@@ -25,22 +24,15 @@ async function parseAndRenderPGN() {
     return;
   }
 
-  // Display header (custom)
-  const tags = chess.header();
-  const headerLine = `${tags.WhiteTitle || ''} ${tags.White || ''} (${tags.WhiteElo || ''}) - ${tags.BlackTitle || ''} ${tags.Black || ''} (${tags.BlackElo || ''})`.trim();
-  const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
-  
-  const container = document.getElementById('pgn-output');
-  container.innerHTML = `<div>${headerLine}</div><div>${eventLine}</div>`;
+  // Get moves as a simple SAN string
+  const moves = chess.pgn()
+                     .replace(/\[%.*?\]/g, '') // remove [%eval] or [%clk]
+                     .replace(/\s+/g, ' ')     // normalize spaces
+                     .trim();
 
-  // Display moves in <p>, including comments
-  const moves = chess.pgn().replace(/\[%.*?\]/g, '').split(/\s*(\d+\.)\s*/).filter(s => s.trim() !== '');
-  moves.forEach(move => {
-    const p = document.createElement('p');
-    p.textContent = move.trim();
-    container.appendChild(p);
-  });
+  // Output moves
+  const container = document.getElementById('moves-output');
+  container.textContent = moves;
 }
 
-document.addEventListener('DOMContentLoaded', parseAndRenderPGN);
-</script>
+document.addEventListener('DOMContentLoaded', renderMoves);
