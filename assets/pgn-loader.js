@@ -1,5 +1,5 @@
 // PGN loader + renderer using chess.js
-// Header formatted on two lines with <p>, moves preserve comments except engine/clock/cal tags
+// Header in <p>, moves grouped together, each annotation in its own <p>
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -31,8 +31,8 @@ function buildHeader(tags) {
     return `<p>${white} - ${black}<br>${siteDate}</p>`;
 }
 
-function extractMovesOnly(pgnText) {
-    // Remove all header tag lines: lines starting with '['
+function extractMovesWithParagraphs(pgnText) {
+    // Remove header lines starting with '['
     const lines = pgnText.split('\n');
     let movesLines = lines.filter(line => !line.startsWith('['));
     let movesText = movesLines.join(' ').trim();
@@ -40,7 +40,34 @@ function extractMovesOnly(pgnText) {
     // Remove engine/clock/cal tags: { [%eval ...] }, { [%clk ...] }, { [%cal ...] }
     movesText = movesText.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
 
-    return movesText;
+    // Split into segments: annotations { ... } and plain moves
+    const segments = movesText.split(/(\{[^}]*\})/g).filter(Boolean);
+
+    let html = '';
+    let movesBuffer = '';
+
+    for (let seg of segments) {
+        seg = seg.trim();
+        if (!seg) continue;
+
+        if (seg.startsWith('{') && seg.endsWith('}')) {
+            // Flush buffered moves as one paragraph
+            if (movesBuffer) {
+                html += `<p>${movesBuffer.trim()}</p>`;
+                movesBuffer = '';
+            }
+            // Add the annotation as its own paragraph
+            html += `<p>${seg}</p>`;
+        } else {
+            // Accumulate moves
+            movesBuffer += ' ' + seg;
+        }
+    }
+
+    // Flush any remaining moves
+    if (movesBuffer) html += `<p>${movesBuffer.trim()}</p>`;
+
+    return html;
 }
 
 async function renderPGN() {
@@ -56,10 +83,10 @@ async function renderPGN() {
     const tags = chess.header();
     const headerHTML = buildHeader(tags);
 
-    const movesText = extractMovesOnly(pgnText);
+    const movesHTML = extractMovesWithParagraphs(pgnText);
 
     const container = document.getElementById('pgn-output');
-    container.innerHTML = `${headerHTML}<p>${movesText}</p>`;
+    container.innerHTML = headerHTML + movesHTML;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
