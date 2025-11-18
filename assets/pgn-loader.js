@@ -1,5 +1,6 @@
 // PGN loader + renderer using chess.js
-// Header with titles, names, Elo, site, date; moves exactly as in PGN
+// Preserve all moves, comments, and engine/clock tags
+// Header formatted on two lines using <p>
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -28,11 +29,12 @@ function buildHeader(tags) {
     const black = formatPlayer(tags.BlackTitle, tags.Black, tags.BlackElo);
     const siteDate = [tags.Site, tags.Date].filter(Boolean).join(', ');
 
-    return `${white} - ${black}\n${siteDate}`;
+    // Use <br> to separate the two lines
+    return `<p>${white} - ${black}<br>${siteDate}</p>`;
 }
 
 function extractMovesOnly(pgnText) {
-    // Remove all header tags at the top: lines starting with '['
+    // Remove all header tag lines: lines starting with '['
     const lines = pgnText.split('\n');
     const movesLines = lines.filter(line => !line.startsWith('['));
     return movesLines.join(' ').trim();
@@ -49,13 +51,13 @@ async function renderPGN() {
     }
 
     const tags = chess.header();
-    const header = buildHeader(tags);
+    const headerHTML = buildHeader(tags);
 
-    // Extract only moves section from the PGN
+    // Extract only moves section from the PGN (preserve comments and engine/clock tags)
     const movesText = extractMovesOnly(pgnText);
 
     const container = document.getElementById('pgn-output');
-    container.textContent = `${header}\n\n${movesText}`;
+    container.innerHTML = `${headerHTML}<p>${movesText}</p>`;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
