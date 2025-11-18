@@ -1,37 +1,50 @@
-// Convert chess notation to figurine notation
-function toFigurineNotation(moveText) {
-  const figurines = {
-    'K': '\u2654', // King
-    'Q': '\u2655', // Queen
-    'R': '\u2656', // Rook
-    'B': '\u2657', // Bishop
-    'N': '\u2658', // Knight
-  };
-  return moveText.replace(/[KQRBN]/g, m => figurines[m] || m);
+// Safer full-page figurine converter: updates ONLY text nodes, never HTML tags
+
+const FIGURINES = {
+  'K': '\u2654',
+  'Q': '\u2655',
+  'R': '\u2656',
+  'B': '\u2657',
+  'N': '\u2658',
+};
+
+function toFigurineNotation(text) {
+  return text.replace(/[KQRBN]/g, m => FIGURINES[m] || m);
 }
 
-function renderFigurineInGameText() {
-  const gameTextDiv = document.querySelector('.game-text');
-  if (!gameTextDiv) return;
-  const paragraphs = gameTextDiv.querySelectorAll('p');
-  paragraphs.forEach(p => {
-    // Replace chess moves inside the paragraph, including captures and disambiguation
-    p.innerHTML = p.innerHTML.replace(/\b([KQRBN][a-h]?[1-8]?[x-]?[a-h][1-8])\b/g, function(match) {
-      return toFigurineNotation(match);
-    });
+const patterns = [
+  { regex: /\bO-O-O\b/g, replace: m => m },
+  { regex: /\bO-O\b/g, replace: m => m },
+  { regex: /\b([KQRBN](?:[a-h]|[1-8])?[x-]?[a-h][1-8](?:=[QRBN])?[+#?!]*)/g, replace: m => toFigurineNotation(m) },
+  { regex: /\b([a-h](?:x[a-h])?[1-8](?:=[QRBN])?[+#?!]*)/g, replace: m => m.replace(/=[QRBN]/, x => '=' + toFigurineNotation(x.slice(1))) },
+  { regex: /\b(\d{1,3}\.{1,3})/g, replace: m => m },
+];
+
+function processTextContent(text) {
+  let result = text;
+  patterns.forEach(p => {
+    result = result.replace(p.regex, p.replace);
+  });
+  return result;
+}
+
+function walkAndReplace(node) {
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
+  const textNodes = [];
+
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode);
+  }
+
+  textNodes.forEach(textNode => {
+    const original = textNode.nodeValue;
+    const replaced = processTextContent(original);
+    if (replaced !== original) {
+      textNode.nodeValue = replaced;
+    }
   });
 }
 
-function renderFigurineInGameData() {
-  const gameDataDiv = document.querySelector('.game-data');
-  if (!gameDataDiv) return;
-  // Replace chess moves inside game-data, including captures and disambiguation
-  gameDataDiv.innerHTML = gameDataDiv.innerHTML.replace(/\b([KQRBN][a-h]?[1-8]?[x-]?[a-h][1-8])\b/g, function(match) {
-    return toFigurineNotation(match);
-  });
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  renderFigurineInGameText();
-  renderFigurineInGameData();
+document.addEventListener('DOMContentLoaded', () => {
+  walkAndReplace(document.body);
 });
