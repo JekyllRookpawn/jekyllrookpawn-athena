@@ -1,3 +1,9 @@
+---
+layout: post
+title:  "Chessboard.js"
+date:   2023-11-11
+---
+
 # chessboard.js [![npm](https://img.shields.io/npm/v/@chrisoakman/chessboardjs.svg)](https://www.npmjs.com/package/@chrisoakman/chessboardjs) [![MIT License](https://img.shields.io/npm/l/@chrisoakman/chessboardjs)](https://github.com/oakmac/chessboardjs/blob/master/LICENSE.md)
 
 > **NOTE:** chessboard.js can be found on npm as `@chrisoakman/chessboardjs`
