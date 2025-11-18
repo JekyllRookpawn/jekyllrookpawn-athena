@@ -1,5 +1,5 @@
 // PGN loader + renderer using chess.js
-// Moves on a single line, annotations immediately after move in <p>, engine/clock/cal removed
+// Moves on a single line, annotations immediately after their move in <p>, engine/clock/cal removed
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -27,51 +27,55 @@ function buildHeader(tags) {
 }
 
 function parseMovesWithAnnotations(pgnText) {
-    // Remove engine/clock/cal tags
-    let cleanText = pgnText.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
+    // Remove engine/clock/cal tags like { [%eval ...] }, { [%clk ...] }, { [%cal ...] }
+    let cleanPGN = pgnText.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
 
-    // Extract annotations with their positions
+    // Extract all annotations with their position in text
     const annotationRegex = /\{([^}]*)\}/g;
     const annotations = [];
     let match;
-    while ((match = annotationRegex.exec(cleanText)) !== null) {
+    while ((match = annotationRegex.exec(cleanPGN)) !== null) {
         const ann = match[1].trim();
         if (ann) annotations.push({ index: match.index, text: `{${ann}}` });
     }
 
-    // Remove annotations from moves for parsing
-    cleanText = cleanText.replace(annotationRegex, '').replace(/\s+/g, ' ').trim();
+    // Remove annotations from PGN for move parsing
+    cleanPGN = cleanPGN.replace(annotationRegex, ' ');
 
-    // Use chess.js to get proper move history
+    // Use chess.js to get move history
     const chess = new Chess();
     chess.load_pgn(pgnText, { sloppy: true });
     const history = chess.history({ verbose: true });
 
-    // Build single-line moves string
+    let html = '';
     let moveNumber = 1;
+    let cursor = 0; // Track character index in cleanPGN
+
+    // Build moves on a single line
     let movesLine = '';
-    const htmlParts = [];
 
     for (let i = 0; i < history.length; i += 2) {
         let moveStr = `${moveNumber}. ${history[i].san}`;
         if (history[i + 1]) moveStr += ` ${history[i + 1].san}`;
         movesLine += moveStr + ' ';
 
-        // Determine if any annotations belong to these moves
-        const moveStartIndex = cleanText.indexOf(history[i].san, movesLine.length - moveStr.length - 1);
+        // Check for annotations belonging to this move
         annotations.forEach(a => {
-            if (a.index >= moveStartIndex && a.index < moveStartIndex + moveStr.length) {
-                htmlParts.push(`<p>${a.text}</p>`);
+            if (a.index >= cursor && a.index < cursor + moveStr.length) {
+                html += `<p>${movesLine.trim()}</p>`; // add moves line
+                html += `<p>${a.text}</p>`;           // annotation right after
+                movesLine = ''; // reset moves line after placing it with annotation
             }
         });
 
+        cursor += moveStr.length + 1; // update cursor for next move
         moveNumber++;
     }
 
-    movesLine = movesLine.trim();
-    htmlParts.unshift(`<p>${movesLine}</p>`); // add moves first
+    // Add any remaining moves that have no annotations
+    if (movesLine.trim()) html += `<p>${movesLine.trim()}</p>`;
 
-    return htmlParts.join('');
+    return html;
 }
 
 async function renderPGN() {
