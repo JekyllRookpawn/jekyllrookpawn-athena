@@ -1,5 +1,5 @@
 // PGN loader + renderer using chess.js
-// Moves numbered correctly, annotations after moves in their own <p>, engine/clock/cal removed
+// Moves on a single line, annotations immediately after move in <p>, engine/clock/cal removed
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -27,55 +27,51 @@ function buildHeader(tags) {
 }
 
 function parseMovesWithAnnotations(pgnText) {
-    // Remove header lines
-    const lines = pgnText.split('\n').filter(line => !line.startsWith('['));
-    let text = lines.join(' ').trim();
+    // Remove engine/clock/cal tags
+    let cleanText = pgnText.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
 
-    // Remove engine/clock/cal tags: { [%eval ...] }, { [%clk ...] }, { [%cal ...] }
-    text = text.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
-
-    // Extract all annotations with positions
+    // Extract annotations with their positions
     const annotationRegex = /\{([^}]*)\}/g;
     const annotations = [];
     let match;
-    while ((match = annotationRegex.exec(text)) !== null) {
+    while ((match = annotationRegex.exec(cleanText)) !== null) {
         const ann = match[1].trim();
-        if (ann) {
-            annotations.push({ index: match.index, text: `{${ann}}` });
-        }
+        if (ann) annotations.push({ index: match.index, text: `{${ann}}` });
     }
 
-    // Remove annotations from moves text for clean parsing
-    const movesText = text.replace(annotationRegex, '').replace(/\s+/g, ' ').trim();
+    // Remove annotations from moves for parsing
+    cleanText = cleanText.replace(annotationRegex, '').replace(/\s+/g, ' ').trim();
 
-    // Use chess.js to get move history
+    // Use chess.js to get proper move history
     const chess = new Chess();
     chess.load_pgn(pgnText, { sloppy: true });
     const history = chess.history({ verbose: true });
 
-    let html = '';
+    // Build single-line moves string
     let moveNumber = 1;
-    let charIndex = 0; // Track position in movesText for annotation placement
+    let movesLine = '';
+    const htmlParts = [];
 
     for (let i = 0; i < history.length; i += 2) {
-        // Build the line for white and black
-        let line = `${moveNumber}. ${history[i].san}`;
-        if (history[i + 1]) line += ` ${history[i + 1].san}`;
+        let moveStr = `${moveNumber}. ${history[i].san}`;
+        if (history[i + 1]) moveStr += ` ${history[i + 1].san}`;
+        movesLine += moveStr + ' ';
 
-        html += `<p>${line}</p>`; // Add moves as a paragraph
-
-        // Find annotations that occur within this move text
+        // Determine if any annotations belong to these moves
+        const moveStartIndex = cleanText.indexOf(history[i].san, movesLine.length - moveStr.length - 1);
         annotations.forEach(a => {
-            if (a.index >= charIndex && a.index < charIndex + line.length) {
-                html += `<p>${a.text}</p>`;
+            if (a.index >= moveStartIndex && a.index < moveStartIndex + moveStr.length) {
+                htmlParts.push(`<p>${a.text}</p>`);
             }
         });
 
-        charIndex += line.length + 1; // update charIndex for next move
         moveNumber++;
     }
 
-    return html;
+    movesLine = movesLine.trim();
+    htmlParts.unshift(`<p>${movesLine}</p>`); // add moves first
+
+    return htmlParts.join('');
 }
 
 async function renderPGN() {
