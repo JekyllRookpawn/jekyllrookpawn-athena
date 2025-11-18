@@ -1,5 +1,5 @@
-// PGN loader + parser + renderer using chess.js with annotations preserved and correct move order
-// Engine/clock tags [%eval ...] [%clk ...] are removed
+// PGN loader + parser + renderer using chess.js
+// Only engine/clock tags [%eval ...] [%clk ...] are removed; other comments are preserved
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -15,10 +15,9 @@ async function loadPGN() {
     }
 }
 
-function cleanAnnotations(annotation) {
-    if (!annotation) return '';
-    const clean = annotation.replace(/\[%.*?\]/g, '').replace(/[\{\}]/g, '').trim();
-    return /[A-Za-z0-9!\?\#\+=]/.test(clean) ? `{${clean}}` : '';
+function removeEngineClockTags(text) {
+    // Only remove [%...] tags, keep other comments intact
+    return text.replace(/\[%.*?\]/g, '');
 }
 
 function buildHeader(tags) {
@@ -29,21 +28,7 @@ function buildHeader(tags) {
     return { headerLine, eventLine };
 }
 
-function extractAnnotations(pgnText) {
-    const annotationMap = {};
-    const regex = /(\d+\.\s*\S+|\.\.\.\s*\S+)\s*(\{[^}]*\})?/g;
-    let match, moveIndex = 0;
-
-    while ((match = regex.exec(pgnText)) !== null) {
-        const cleaned = cleanAnnotations(match[2]);
-        if (cleaned) annotationMap[moveIndex] = cleaned;
-        moveIndex++;
-    }
-
-    return annotationMap;
-}
-
-function buildMovesText(chess, annotationMap) {
+function buildMovesText(chess) {
     const history = chess.history({ verbose: true });
     let movesText = '';
 
@@ -52,11 +37,8 @@ function buildMovesText(chess, annotationMap) {
         const whiteMove = history[i]?.san || '';
         const blackMove = history[i + 1]?.san || '';
 
-        const whiteAnn = annotationMap[i] ? ' ' + annotationMap[i] : '';
-        const blackAnn = annotationMap[i + 1] ? ' ' + annotationMap[i + 1] : '';
-
-        movesText += `${moveNumber}. ${whiteMove}${whiteAnn}`;
-        if (blackMove) movesText += ` ${blackMove}${blackAnn} `;
+        movesText += `${moveNumber}. ${whiteMove}`;
+        if (blackMove) movesText += ` ${blackMove} `;
         else movesText += ' ';
     }
 
@@ -70,8 +52,8 @@ async function renderPGN() {
     let pgnText = await loadPGN();
     if (!pgnText) return;
 
-    // Remove engine/clock tags globally
-    pgnText = pgnText.replace(/\[%.*?\]/g, '');
+    // Only remove engine/clock tags, keep other annotations
+    pgnText = removeEngineClockTags(pgnText);
 
     const chess = new Chess();
     if (!chess.load_pgn(pgnText)) {
@@ -81,11 +63,9 @@ async function renderPGN() {
 
     const tags = chess.header();
     const { headerLine, eventLine } = buildHeader(tags);
-    const annotationMap = extractAnnotations(pgnText);
-    const movesText = buildMovesText(chess, annotationMap);
+    const movesText = buildMovesText(chess);
 
     const container = document.getElementById('pgn-output');
-    // Güvenli text render
     container.textContent = `${headerLine}\n${eventLine}\n${movesText}`;
 }
 
