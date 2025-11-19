@@ -21,7 +21,7 @@
           </ul>
         </div>
 
-        <div class="container mx-auto px-2 mt-4 mb-2 clearfix header-text" style="background-image: url(https://www.satranchess.com/images/banner.jpg); background-size: 100vw auto;">
+        <div class="container mx-auto px-2 mt-4 mb-2 clearfix header-text full-bleed">
           <h1 class="h0 inline-block py-2 mt-4 header-title">{{ site.title }}</h1>
 
           <div class="clearfix mb-4 py-1">
@@ -29,6 +29,14 @@
             <div class="col-1 sm-width-full border-top-thick">
             </div>
           </div>
+
+          <style>
+            .full-bleed {
+              background-image: url(https://www.satranchess.com/images/banner.jpg);
+              margin: 0 calc(50% - 50vw);
+              padding: 0 calc(50vw - 50%);
+            }
+          </style>
 
         </div>
       </header>
