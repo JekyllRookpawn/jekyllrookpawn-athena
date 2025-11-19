@@ -31,9 +31,13 @@
           </div>
 
           <style>
-            .full-bleed {
+            .full-bleed::before {
+              content: " ";
+              position: absolute;
+              width: 100vw;
+              height: auto;
+              z-index: -1;
               background-image: url(https://www.satranchess.com/images/banner.jpg);
-              background-size: 100vw auto;
             }
           </style>
 
