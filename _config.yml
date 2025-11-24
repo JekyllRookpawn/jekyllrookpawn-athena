@@ -13,7 +13,7 @@
 # you will see them accessed via {{ site.title }}, {{ site.github_repo }}, and so on.
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
-title: JGPA Chess Blog
+title: JGPA Chess Blog Theme
 description: Chess Blog theme with figurine notation, FEN diagrams, and a built-in PGN viewer, forked from Athena, a simple and elegant for Jekyll and GitHub Pages.
 # baseurl: "/athena" # the subpath of your site, e.g. /blog
 url: "https://satranchess2025.github.io" # the base hostname & protocol for your site
