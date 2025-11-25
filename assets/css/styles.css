@@ -2,3 +2,7 @@ img[src*="fen.gif"] {
   width: 350px !important;
   height: auto;
 }
+
+.board-wrapper {max-width: 400px; }
+.board-wrapper * {box-sizing: content-box !important;}
+FEN {display: none;}
