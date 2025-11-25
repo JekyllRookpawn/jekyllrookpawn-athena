@@ -26,9 +26,9 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
 
     const container = tag.querySelector('.pgn-viewer');
-    const boardEl  = container.querySelector(".board");
-    const metaEl   = container.querySelector(".meta");
-    const movesEl  = container.querySelector(".moves");
+    const boardEl  = container.querySelector(".board");
+    const metaEl   = container.querySelector(".meta");
+    const movesEl  = container.querySelector(".moves");
 
     // --- Parse PGN ---
     const chess = new Chess();
@@ -70,7 +70,14 @@ document.addEventListener("DOMContentLoaded", () => {
     movesEl.innerHTML = html;
 
     // --- Initialize board ---
-    const board = Chessboard(boardEl, { position: chess.fen() });
+    // *******************************************************************
+    // FIX: Added pieceTheme to point to the CDN for piece images
+    // *******************************************************************
+    const board = Chessboard(boardEl, {
+      position: chess.fen(),
+      pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+    });
+    // *******************************************************************
 
     // --- Click moves to jump to position ---
     movesEl.querySelectorAll(".mv").forEach(a => {
