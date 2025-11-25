@@ -1,7 +1,9 @@
+/*
 img[src*="fen.gif"] {
   width: 350px !important;
   height: auto;
 }
+*/
 
 /* CSS for chessboard.js rendering */
 
