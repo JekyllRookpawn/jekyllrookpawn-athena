@@ -12,11 +12,6 @@ FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+
     pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' 
 });
 </script>
-<style>
-  #myBoard *,
-  #myBoard *::before,
-  #myBoard *::after {
-    /* This is the key fix for the 8th square wrapping */
-    box-sizing: content-box !important; 
-  }
-</style>
+
+
+<FEN>r2qk2r/pb1p1pp1/2p4p/4p3/3bP3/2N5/PPP2PPP/R1BQR1K1 w kq - 0 14</FEN>
