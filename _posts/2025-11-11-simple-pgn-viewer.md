@@ -6,6 +6,21 @@ categories: writing
 FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7
 ---
 
+<div id="myBoard" style="width: 400px"></div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {          
+    var config = {
+                position: 'start',
+                // Use CDN for piece images
+                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' 
+            };
+
+            // Initialize the board in the 'myBoard' div
+            var board = Chessboard('myBoard', config);
+        });
+    </script>
+
 {% raw %}
 <pgn>
 [Event "Demo"]
