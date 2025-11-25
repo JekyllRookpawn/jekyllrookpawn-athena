@@ -14,17 +14,6 @@ layout: default
 
   <div class="prose py-4" itemprop="articleBody">
       {{ content }}
-  
-
-  {% assign after_open = page.content | split: '<pgn>' | last %}
-{% assign pgn_text   = after_open | split: '</pgn>' | first %}
-
-{% unless pgn_text == page.content %}
-<div class="pgn-viewer">
-  {{ pgn_text | strip }}
-</div>
-{% endunless %}
-
     </div>
 </article>
 
