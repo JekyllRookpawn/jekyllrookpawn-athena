@@ -1,8 +1,14 @@
 img[src*="fen.gif"] {
-  width: 350px !important;
+  width: 400px !important;
   height: auto;
 }
 
-.board-wrapper {max-width: 400px; }
+#myBoard *,
+#myBoard *::before,
+#myBoard *::after {
+  box-sizing: content-box !important; 
+}
+
+.board-wrapper {max-width: 400px !important;}
 .board-wrapper * {box-sizing: content-box !important;}
 FEN {display: none;}
