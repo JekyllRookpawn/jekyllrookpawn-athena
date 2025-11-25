@@ -1,8 +1,3 @@
-console.log("RAW PGN RECEIVED BY BROWSER:");
-console.log("----START----");
-console.log(scriptTag.textContent);
-console.log("----END----");
-
 // pgn-viewer.js
 // Requires: chess.js + chessboard.js
 
