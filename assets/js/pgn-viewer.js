@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Create viewer container ---
     tag.innerHTML = `
       <div class="pgn-viewer">
-        <div class="board" id="board${index}"></div>
+        <div class="board" id="board${index}" style="width:400px"></div>
         <div class="meta"></div>
         <div class="moves"></div>
       </div>
@@ -70,14 +70,13 @@ document.addEventListener("DOMContentLoaded", () => {
     movesEl.innerHTML = html;
 
     // --- Initialize board ---
-    // *******************************************************************
-    // FIX: Added pieceTheme to point to the CDN for piece images
-    // *******************************************************************
     const board = Chessboard(boardEl, {
       position: chess.fen(),
       pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
     });
-    // *******************************************************************
+    
+    // ⭐ IMPORTANT FIX: Call resize() to force the board to calculate its size.
+    board.resize(); 
 
     // --- Click moves to jump to position ---
     movesEl.querySelectorAll(".mv").forEach(a => {
