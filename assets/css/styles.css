@@ -2,34 +2,3 @@ img[src*="fen.gif"] {
   width: 350px !important;
   height: auto;
 }
-
-/* CSS for chessboard.js rendering */
-
-/* 1. Define the size and bounds of the viewer container */
-.pgn-viewer .board {
-  /* Set your fixed width for the entire board area */
-  width: 350px !important; 
-  
-  /* IMPORTANT: Ensures nothing leaks outside the container */
-  overflow: hidden !important; 
-  
-  /* Apply padding/margin as needed for spacing */
-  margin: 10px auto; 
-}
-
-/* 2. Apply the Box-Sizing fix to the core chessboard elements */
-.chessboard,
-.chessboard * {
-  /* This prevents borders and padding from expanding the square size */
-  box-sizing: border-box !important;
-}
-
-/* 3. Force the board squares to the exact 1/8th width */
-/* The .square class is what makes up the 64 squares */
-.chessboard .square {
-  /* 12.5% is exactly 1/8th of the container width (350px) */
-  width: 12.5% !important; 
-  
-  /* Ensure the squares float correctly to sit side-by-side */
-  float: left !important;
-}
