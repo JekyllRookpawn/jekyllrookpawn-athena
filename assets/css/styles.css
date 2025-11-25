@@ -8,12 +8,9 @@ img[src*="fen.gif"] {
 /* CSS for chessboard.js rendering */
 
 /* 1. Set the width ONLY on the outer container */
-.pgn-viewer .board {
-  /* Set your desired width here (e.g., 350px) */
-  width: 350px !important;
-  
+.pgn-viewer .board {  
   /* Always recommended to contain floating squares */
-  overflow: hidden; 
+  overflow: hidden !important; 
 }
 
 /* 2. Apply the box-sizing fix ONLY to handle padding/borders */
