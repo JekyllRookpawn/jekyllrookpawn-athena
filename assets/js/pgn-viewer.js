@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Create viewer container ---
     tag.innerHTML = `
       <div class="pgn-viewer">
-        <div class="board" id="board${index}" style="width:400px"></div>
+        <div class="board" id="board${index}"></div>
         <div class="meta"></div>
         <div class="moves"></div>
       </div>
