@@ -5,15 +5,6 @@ img[src*="fen.gif"] {
 
 /* CSS for chessboard.js rendering */
 
-.pgn-viewer .board {  
-  overflow: hidden !important; 
-}
-
-.chessboard,
-.chessboard * {
-  box-sizing: border-box !important;
-}
-
 /* 1. Define the size and bounds of the viewer container */
 .pgn-viewer .board {
   /* Set your fixed width for the entire board area */
