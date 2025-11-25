@@ -6,19 +6,19 @@ categories: writing
 FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7
 ---
 
-FEN to GIF chess diagram generator by Lichess works with the below Markdown syntax:
+Automatic FEN to chess diagram generator works with the below Markdown syntax:
 
 ```
-![image](https://lichess1.org/export/fen.gif?fen=[FEN])
+<FEN>[fen]</FEN>
 ```
 
-Replace "[FEN]" with a valid FEN and the result will be a diagram:
+Replace "[fen]" with a valid FEN and the result will be a diagram:
 
-![image](https://lichess1.org/export/fen.gif?fen=rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7)
+<FEN>rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7</FEN>
 
-All diagrams are automatically sized to 350px in all pages.
+All diagrams are automatically sized to 400px in all pages.
 
-If you want a post to feature a diagram as a thumbnail, type the FEN in the post front matter as shown below:
+Also, if you want a post to feature a diagram as a thumbnail, type the FEN in the post front matter as shown below:
 
 ```
 ---
