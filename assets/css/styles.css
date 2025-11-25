@@ -3,7 +3,14 @@ img[src*="fen.gif"] {
   height: auto;
 }
 
-.chessboard, .chessboard * {
-  box-sizing: border-box !important;
+.pgn-viewer .board {
+  width: 350px; 
+  overflow: hidden; 
+}
+
+.chessboard,
+.chessboard * {
+  /* This ensures borders/padding are included INSIDE the element's width */
+  box-sizing: border-box !important; 
   width: 350px !important;
 }
