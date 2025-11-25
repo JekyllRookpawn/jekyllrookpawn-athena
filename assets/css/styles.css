@@ -3,14 +3,22 @@ img[src*="fen.gif"] {
   height: auto;
 }
 
+/* CSS for chessboard.js rendering */
+
+/* 1. Set the width ONLY on the outer container */
 .pgn-viewer .board {
-  width: 350px !important; 
-  overflow: hidden !important; 
+  /* Set your desired width here (e.g., 350px) */
+  width: 350px !important;
+  
+  /* Always recommended to contain floating squares */
+  overflow: hidden; 
 }
 
+/* 2. Apply the box-sizing fix ONLY to handle padding/borders */
 .chessboard,
 .chessboard * {
-  /* This ensures borders/padding are included INSIDE the element's width */
-  box-sizing: border-box !important; 
-  width: 350px !important;
+  /* This prevents padding/borders from causing the 8th square to wrap. */
+  box-sizing: border-box !important;
+  
+  /* IMPORTANT: DO NOT set a width here! Let the library calculate it (12.5%). */
 }
