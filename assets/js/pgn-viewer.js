@@ -1,5 +1,10 @@
+console.log("RAW PGN RECEIVED BY BROWSER:");
+console.log("----START----");
+console.log(scriptTag.textContent);
+console.log("----END----");
+
 // pgn-viewer.js
-// Requires: chess.js + chessboard.js (or your viewer library)
+// Requires: chess.js + chessboard.js
 
 document.addEventListener("DOMContentLoaded", () => {
   const sources = document.querySelectorAll("script.pgn-source");
