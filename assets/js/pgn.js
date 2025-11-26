@@ -1,144 +1,89 @@
-var board = null;
-var game = null;
-var moveHistory = []; 
-var currentMove = -1;
-var moveNotation = []; // Stores the move objects with SAN notation
+document.querySelectorAll(".pgn-viewer").forEach(initViewer);
 
-// Function to jump to a specific move index
-function jumpToMove(index) {
-    currentMove = index;
-    displayPosition();
+function initViewer(container) {
+  const boardEl = container.querySelector(".board");
+  const pgnDisplay = container.querySelector(".pgnDisplay");
+  const pgnEl = container.querySelector("pgn");
+
+  const startBtn = container.querySelector(".startBtn");
+  const prevBtn  = container.querySelector(".prevBtn");
+  const nextBtn  = container.querySelector(".nextBtn");
+  const endBtn   = container.querySelector(".endBtn");
+
+  const game = new Chess();
+  const rawPGN = pgnEl.textContent.trim();
+  pgnEl.style.display = "none";
+
+  game.load_pgn(rawPGN);
+  const moves = game.history();
+  game.reset();
+
+  let currentMove = 0;
+
+  const board = Chessboard(boardEl, {
+    position: "start",
+    draggable: false
+  });
+
+  function updateBoard() {
+    board.position(game.fen());
+    renderPGN();
+  }
+
+  function renderPGN() {
+    let html = "";
+
+    moves.forEach((move, i) => {
+      if (i % 2 === 0) {
+        html += `${Math.floor(i / 2) + 1}. `;
+      }
+
+      const cls = i === currentMove - 1 ? "active-move" : "";
+      html += `<span class="pgn-move ${cls}" data-index="${i}">${move}</span> `;
+    });
+
+    pgnDisplay.innerHTML = html;
+
+    // click-to-jump
+    pgnDisplay.querySelectorAll(".pgn-move").forEach(span => {
+      span.onclick = () => goToMove(+span.dataset.index);
+    });
+  }
+
+  function goToMove(index) {
+    game.reset();
+    currentMove = 0;
+
+    for (let i = 0; i <= index; i++) {
+      game.move(moves[i]);
+      currentMove++;
+    }
+    updateBoard();
+  }
+
+  startBtn.onclick = () => {
+    game.reset();
+    currentMove = 0;
+    updateBoard();
+  };
+
+  endBtn.onclick = () => {
+    goToMove(moves.length - 1);
+  };
+
+  nextBtn.onclick = () => {
+    if (currentMove >= moves.length) return;
+    game.move(moves[currentMove]);
+    currentMove++;
+    updateBoard();
+  };
+
+  prevBtn.onclick = () => {
+    if (currentMove <= 0) return;
+    game.undo();
+    currentMove--;
+    updateBoard();
+  };
+
+  updateBoard();
 }
-
-function displayPosition() {
-    // Guard clause to prevent errors if the board hasn't been initialized yet.
-    if (!board) {
-        return;
-    }
-    
-    if (currentMove < 0) {
-        board.position('start');
-    } else if (currentMove < moveHistory.length) {
-        board.position(moveHistory[currentMove].fen, false);
-    }
-
-    // Update button states
-    $('#startBtn').prop('disabled', currentMove < 0);
-    $('#prevBtn').prop('disabled', currentMove < 0);
-    
-    // Disable forward buttons at the end
-    $('#nextBtn').prop('disabled', currentMove === moveHistory.length - 1);
-    $('#endBtn').prop('disabled', currentMove === moveHistory.length - 1);
-    
-    // Highlight current move
-    $('#pgnDisplay a').removeClass('highlight');
-    if (currentMove >= 0) {
-        $(`#move-link-${currentMove}`).addClass('highlight');
-    }
-}
-
-function toStart() {
-    currentMove = -1;
-    displayPosition();
-}
-
-function prevMove() {
-    if (currentMove > -1) {
-        currentMove--;
-        displayPosition();
-    }
-}
-
-function nextMove() {
-    if (currentMove < moveHistory.length - 1) {
-        currentMove++;
-        displayPosition();
-    }
-}
-
-function toEnd() {
-    currentMove = moveHistory.length - 1;
-    displayPosition();
-}
-
-$(document).ready(function() {
-    if (typeof Chess === 'undefined' || typeof Chessboard === 'undefined') {
-        console.error('Error: Libraries failed to load.'); 
-        return;
-    }
-
-    // FIX: Use native DOM methods for maximum reliability when reading content 
-    // from custom HTML tags like <pgn>.
-    const pgnEl = document.getElementById('pgn-source');
-    let pgnString = '';
-    
-    if (pgnEl) {
-        // Use textContent for reliable retrieval of raw text from a custom tag.
-        pgnString = (pgnEl.textContent || '').trim(); 
-        
-        // Aggressively clean up potential invisible or non-standard characters
-        pgnString = pgnString.replace(/[\u200B-\u200D\uFEFF]/g, '');
-        pgnString = pgnString.replace(/[\u2654-\u265F]/g, '');
-    }
-    
-    if (!pgnString) {
-        // Updated error message to include a helpful hint
-        console.error('Error: No PGN found in the <pgn> source tag. Please check that the <pgn id="pgn-source"> element contains valid PGN data.');
-        return;
-    }
-
-    try {
-        game = new Chess();
-        
-        if (!game.load_pgn(pgnString, { sloppy: true })) {
-            console.error("Error: PGN parsing failed.", pgnString);
-            return; 
-        }
-    } catch (e) {
-        console.error("Error initializing chess.js or loading PGN:", e);
-        return; 
-    }
-    
-    // 1. Get all moves with verbose information
-    moveNotation = game.history({ verbose: true });
-    
-    // 2. Reset board and generate FEN history by replaying moves
-    game.reset(); 
-    for (let i = 0; i < moveNotation.length; i++) {
-        game.move(moveNotation[i]);
-        moveHistory.push({
-            fen: game.fen(),
-            turn: game.turn(),
-            ply: game.history().length
-        });
-    }
-
-    // 3. Construct PGN HTML with clickable links
-    let pgnHtml = '';
-    for (let i = 0; i < moveNotation.length; i++) {
-        const move = moveNotation[i];
-
-        if (i % 2 === 0) {
-            // White's move: include move number
-            const moveNumber = Math.floor(i / 2) + 1;
-            // Use strong tag for move number for better visibility
-            pgnHtml += ` <strong>${moveNumber}.</strong> `;
-        }
-
-        // Create the clickable link for the half-move
-        // Added return false to the onclick to prevent default link action
-        pgnHtml += `<a href="#" id="move-link-${i}" onclick="jumpToMove(${i}); return false;">${move.san}</a> `;
-    }
-    $('#pgnDisplay').html(pgnHtml);
-
-    // 4. Initialize the board
-    const boardConfig = {
-        draggable: false,
-        position: 'start',
-        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-    };
-    board = Chessboard('board', boardConfig);
-
-    // 5. Set initial display state
-    toStart();
-});

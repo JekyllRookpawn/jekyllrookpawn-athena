@@ -6,16 +6,18 @@ categories: writing
 FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7
 ---
 
-<div id="board"></div>
+<div class="pgn-viewer">
+  <div class="board"></div>
 
-<div class="controls">
-  <button id="startBtn" onclick="toStart()"><<</button>
-  <button id="prevBtn" onclick="prevMove()"><</button>
-  <button id="nextBtn" onclick="nextMove()">></button>
-  <button id="endBtn" onclick="toEnd()">>></button>
+  <div class="controls">
+    <button class="startBtn"><<</button>
+    <button class="prevBtn"><</button>
+    <button class="nextBtn">></button>
+    <button class="endBtn">>></button>
+  </div>
+
+  <p class="pgnDisplay"></p>
 </div>
-
-<p id="pgnDisplay"></p>
 
 <pgn>
 [Event "Paris Opera House"]
