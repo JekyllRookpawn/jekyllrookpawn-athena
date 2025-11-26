@@ -1,3 +1,5 @@
+.diagram {margin-top: 1rem; margin-bottom: 1rem;}
+
 img[src*="fen.gif"] {
   width: 400px !important;
   height: auto;
@@ -5,7 +7,10 @@ img[src*="fen.gif"] {
 
 #myBoard *,
 #myBoard *::before,
-#myBoard *::after {
+#myBoard *::after,
+#board *,
+#board *::before,
+#board *::after {
   box-sizing: content-box !important; 
 }
 
