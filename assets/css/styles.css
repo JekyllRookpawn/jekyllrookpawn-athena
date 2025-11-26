@@ -9,6 +9,7 @@ img[src*="fen.gif"] {
   box-sizing: content-box !important; 
 }
 
+#board {width: 400px;}
 .board-wrapper {max-width: 400px !important;}
 .board-wrapper * {box-sizing: content-box !important;}
 FEN {display: none;}
