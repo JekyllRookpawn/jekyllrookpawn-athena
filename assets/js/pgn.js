@@ -1,23 +1,3 @@
-
-    (function() {
-        const pgnElements = document.getElementsByTagName('pgn');
-        
-        for (let i = 0; i < pgnElements.length; i++) {
-            const pgnEl = pgnElements[i];
-            const pgnContent = pgnEl.innerHTML;
-            
-            // 1. Create the <script type="text/pgn"> element
-            const scriptTag = document.createElement('script');
-            scriptTag.setAttribute('type', 'text/pgn');
-            scriptTag.setAttribute('id', 'game-pgn'); 
-            scriptTag.innerHTML = pgnContent;
-            
-            // 2. Append the new <script> tag, keeping the original PGN content inside the <pgn> tag.
-            // The line 'pgnEl.innerHTML = '';' has been removed to preserve the original content.
-            pgnEl.appendChild(scriptTag);
-        }
-    })();
-
 var board = null;
         var game = null;
         var moveHistory = []; 
