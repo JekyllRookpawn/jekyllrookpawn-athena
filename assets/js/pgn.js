@@ -1,7 +1,6 @@
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll(".pgn-viewer").forEach(c => {
-    const board = Chessboard(c.querySelector(".board"), {
-      position: "start"
-    });
-  });
+const board = Chessboard(boardEl, {
+  position: "start",
+  draggable: false,
+  pieceTheme: "https://chessboardjs.com/img/chesspieces/wiki/{piece}.png"
 });
+
