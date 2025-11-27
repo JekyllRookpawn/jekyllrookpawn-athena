@@ -13,6 +13,8 @@
     var StickyBoard = {
         board: null,
         moves: [],
+        moveSpans: [],
+        currentPly: -1, // -1 = initial position (before moves)
 
         initBoard() {
             if (document.getElementById("sticky-chessboard")) return;
@@ -33,15 +35,36 @@
             this.moves = history;
         },
 
+        // ⭐ Apply moves up to (and including) plyIndex
         showPosition(plyIndex) {
-            var temp = new Chess();
+            this.currentPly = plyIndex;
 
-            // ⭐ FIXED: apply moves up to and INCLUDING plyIndex
+            var temp = new Chess();
             for (var i = 0; i <= plyIndex && i < this.moves.length; i++) {
                 temp.move(this.moves[i]);
             }
-
             this.board.position(temp.fen());
+
+            this.highlightMove(plyIndex);
+        },
+
+        highlightMove(plyIndex) {
+            this.moveSpans.forEach(s => s.classList.remove("sticky-move-active"));
+
+            var span = this.moveSpans.find(s => parseInt(s.dataset.ply, 10) === plyIndex);
+            if (span) span.classList.add("sticky-move-active");
+        },
+
+        gotoNext() {
+            if (this.currentPly + 1 < this.moves.length) {
+                this.showPosition(this.currentPly + 1);
+            }
+        },
+
+        gotoPrev() {
+            if (this.currentPly - 1 >= -1) {
+                this.showPosition(this.currentPly - 1);
+            }
         },
 
         activate(root) {
@@ -51,21 +74,19 @@
 
             blocks.forEach(block => {
 
-                // ⭐ Load real move list from pgn.js
                 if (block._pgnHistory) {
                     StickyBoard.loadMoves(block._pgnHistory);
                 } else {
-                    console.warn("stickyboard.js: no _pgnHistory found in block");
+                    console.warn("stickyboard.js: no _pgnHistory found");
                     return;
                 }
 
+                this.moveSpans = [];
                 var plyCounter = 0;
 
                 var spans = block.querySelectorAll("span");
 
                 spans.forEach(span => {
-
-                    // Remove move numbers before SAN parsing
                     var text = span.textContent
                         .replace(/^\d+\.+/, "")
                         .trim();
@@ -81,6 +102,7 @@
 
                         if (isSAN) {
                             span.dataset.ply = plyCounter;
+                            this.moveSpans.push(span);
                             plyCounter++;
                         } else {
                             span.dataset.ply = plyCounter;
@@ -93,8 +115,19 @@
                     }
                 });
             });
+
+            // ⭐ Keyboard navigation
+            window.addEventListener("keydown", (e) => {
+                if (e.key === "ArrowRight") {
+                    this.gotoNext();
+                }
+                if (e.key === "ArrowLeft") {
+                    this.gotoPrev();
+                }
+            });
         }
     };
+
 
     // ===== CSS =====
     var style = document.createElement("style");
@@ -111,18 +144,24 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     border-radius: 4px;
 }
+
 .sticky-move:hover {
     text-decoration: underline;
+}
+
+.sticky-move-active {
+    background: #ffe38a;
+    border-radius: 4px;
+    padding: 2px 4px;
 }
 `;
     document.head.appendChild(style);
 
-    // ===== Initialize AFTER PGNRenderer =====
+
     document.addEventListener("DOMContentLoaded", () => {
         if (window.PGNRenderer && window.PGNRenderer.run) {
             StickyBoard.activate(document);
         } else {
-            // Retry in case pgn.js loads slow
             setTimeout(() => StickyBoard.activate(document), 300);
         }
     });
