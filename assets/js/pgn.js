@@ -1,6 +1,5 @@
 // assets/js/chess/pgn.js
-// Turn <pgn>...</pgn> into a structured chess blog post.
-// Requires chess.js and chessboard.js to be loaded first.
+// Convert <pgn>...</pgn> into formatted blog posts with diagrams.
 
 (function () {
   "use strict";
@@ -10,11 +9,11 @@
 
   function ensureDeps() {
     if (typeof Chess === "undefined") {
-      console.warn("pgn.js: Chess (chess.js) is not loaded.");
+      console.warn("pgn.js: Chess.js missing");
       return false;
     }
     if (typeof Chessboard === "undefined") {
-      console.warn("pgn.js: Chessboard (chessboard.js) is not loaded.");
+      console.warn("pgn.js: Chessboard.js missing");
       return false;
     }
     return true;
@@ -22,13 +21,12 @@
 
   function extractYear(dateStr) {
     if (!dateStr) return "";
-    const year = dateStr.split(".")[0];
-    return year || "";
+    return dateStr.split(".")[0];
   }
 
-  function createBoard(id, fenOrStart) {
+  function createBoard(id, position) {
     Chessboard(id, {
-      position: fenOrStart === "start" ? "start" : fenOrStart,
+      position: position === "start" ? "start" : position,
       draggable: false,
       pieceTheme: PIECE_THEME_URL
     });
@@ -38,43 +36,44 @@
     if (!ensureDeps()) return;
 
     const raw = el.textContent.trim();
-    if (!raw) return;
 
     const game = new Chess();
-    const ok = game.load_pgn(raw, { sloppy: true });
+    const ok = game.load_pgn(raw, { sloppy: true });   // ✅ correct API
+
     if (!ok) {
-      console.warn("pgn.js: Could not load PGN", raw);
+      console.warn("pgn.js: Could not parse PGN:", raw);
       return;
     }
 
-    // Headers from chess.js
-    const headers = game.header ? game.header() : {};
+    // Extract headers
+    const headers = game.header();
 
     const whiteTitle = headers.WhiteTitle || "";
-    const whiteName = headers.White || "White";
-    const whiteElo = headers.WhiteElo ? `(${headers.WhiteElo})` : "";
+    const whiteName  = headers.White || "White";
+    const whiteElo   = headers.WhiteElo ? `(${headers.WhiteElo})` : "";
 
     const blackTitle = headers.BlackTitle || "";
-    const blackName = headers.Black || "Black";
-    const blackElo = headers.BlackElo ? `(${headers.BlackElo})` : "";
+    const blackName  = headers.Black || "Black";
+    const blackElo   = headers.BlackElo ? `(${headers.BlackElo})` : "";
 
     const event = headers.Event || "";
-    const year = extractYear(headers.Date);
+    const year  = extractYear(headers.Date);
 
+    // Combine titles + names + elos
     const whiteLine = [whiteTitle, whiteName, whiteElo].filter(Boolean).join(" ");
     const blackLine = [blackTitle, blackName, blackElo].filter(Boolean).join(" ");
 
-    // Get moves (verbose) then reset to start for stepping
-    const moves = game.history({ verbose: true });
+    // Get verbose moves, then reset to start
+    const verboseMoves = game.history({ verbose: true });
     game.reset();
 
-    // Wrapper for everything
+    // Create wrapper
     const wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
     // H2: players
     const h2 = document.createElement("h2");
-    h2.textContent = `${whiteLine} – ${blackLine}`.trim();
+    h2.textContent = `${whiteLine} – ${blackLine}`;
     wrapper.appendChild(h2);
 
     // H3: event + year
@@ -82,82 +81,68 @@
     h3.textContent = year ? `${event}, ${year}` : event;
     wrapper.appendChild(h3);
 
-    // Starting position diagram
-    const startBoard = document.createElement("div");
-    const startBoardId = `pgn-start-board-${index}`;
-    startBoard.id = startBoardId;
-    startBoard.className = "pgn-board";
-    wrapper.appendChild(startBoard);
-    createBoard(startBoardId, "start");
+    // Starting diagram
+    const startDiv = document.createElement("div");
+    const startId = `pgn-start-${index}`;
+    startDiv.id = startId;
+    startDiv.className = "pgn-board";
+    wrapper.appendChild(startDiv);
+    createBoard(startId, "start");
 
-    // Paragraphs of moves + diagrams every 5 full moves
+    // Moves grouped into paragraphs
     let p = document.createElement("p");
-    let fullMoveCount = 0;
+    let fullMoves = 0;
 
-    for (let i = 0; i < moves.length; i++) {
-      const m = moves[i];
+    for (let i = 0; i < verboseMoves.length; i++) {
+      const m = verboseMoves[i];
       const isWhite = m.color === "w";
-      const moveNumber = Math.floor(i / 2) + 1;
+      const moveNo = Math.floor(i / 2) + 1;
 
-      const text = isWhite
-        ? `${moveNumber}. ${m.san}`
-        : m.san;
+      const text = isWhite ? `${moveNo}. ${m.san}` : m.san;
 
       const span = document.createElement("span");
       span.textContent = text + " ";
       p.appendChild(span);
 
-      // Advance game position
       game.move(m.san);
 
-      // After each Black move, count a full move
+      // Count full moves (after black's move)
       if (!isWhite) {
-        fullMoveCount++;
+        fullMoves++;
 
-        if (fullMoveCount % 5 === 0) {
-          // Finish this paragraph
+        if (fullMoves % 5 === 0) {
           wrapper.appendChild(p);
 
-          // Insert diagram at current position
-          const boardDiv = document.createElement("div");
-          const boardId = `pgn-board-${index}-${fullMoveCount}`;
-          boardDiv.id = boardId;
-          boardDiv.className = "pgn-board";
-          wrapper.appendChild(boardDiv);
-          createBoard(boardId, game.fen());
+          // Insert diagram after move 5, 10, 15...
+          const diag = document.createElement("div");
+          const diagId = `pgn-board-${index}-${fullMoves}`;
+          diag.id = diagId;
+          diag.className = "pgn-board";
+          wrapper.appendChild(diag);
+          createBoard(diagId, game.fen());
 
-          // Start new paragraph
           p = document.createElement("p");
         }
       }
     }
 
-    // Append last paragraph if it has content
-    if (p.textContent.trim().length > 0) {
-      wrapper.appendChild(p);
-    }
+    if (p.textContent.trim()) wrapper.appendChild(p);
 
-    // Replace <pgn> with our generated block
     el.replaceWith(wrapper);
 
-    // Let figurine.js convert SAN to figurines inside this block
-    if (window.ChessFigurine && typeof window.ChessFigurine.run === "function") {
-      window.ChessFigurine.run(wrapper);
-    }
+    // Convert SAN → figurines
+    if (window.ChessFigurine) ChessFigurine.run(wrapper);
   }
 
-  function renderAllPGNs(root) {
-    const scope = root || document;
-    const nodes = scope.querySelectorAll("pgn");
-    nodes.forEach((el, i) => renderPGNElement(el, i));
+  function renderAll(root) {
+    root.querySelectorAll("pgn").forEach((el, i) => renderPGNElement(el, i));
   }
 
   function init() {
-    renderAllPGNs(document);
+    renderAll(document);
 
-    // Optional: expose manual API
     window.PGNRenderer = {
-      run: (root) => renderAllPGNs(root || document)
+      run: (root) => renderAll(root || document)
     };
   }
 
