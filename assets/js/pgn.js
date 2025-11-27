@@ -108,7 +108,7 @@
     var comments = extraction.comments;
     var variations = extraction.variations;
 
-    // Filter variations: keep only those that contain at least one SAN-like move
+    // Filter variations: keep only those that look like real SAN sequences
     var flatVariations = [];
     for (var i = 0; i < variations.length; i++) {
       var v = variations[i].trim();
@@ -125,7 +125,7 @@
       if (sanPattern.test(v)) {
         flatVariations.push(v);
       }
-      // Otherwise ignore junk like "DERLD"
+      // else ignore junk like "DERLD"
     }
 
     var game = new Chess();
@@ -192,6 +192,18 @@
     wrapper.appendChild(p1);
 
     // ----------------------------
+    // VARIATIONS as separate paragraphs (no "Variation:" label)
+    // ----------------------------
+    if (flatVariations.length > 0) {
+      for (var vIdx = 0; vIdx < flatVariations.length; vIdx++) {
+        var vP = document.createElement("p");
+        vP.className = "pgn-variation";
+        vP.textContent = flatVariations[vIdx];
+        wrapper.appendChild(vP);
+      }
+    }
+
+    // ----------------------------
     // MID-GAME DIAGRAM
     // ----------------------------
     game.reset();
@@ -208,9 +220,9 @@
     queueBoard(midId, midFen);
 
     // ----------------------------
-    // COMMENTS + VARIATIONS PARAGRAPH
+    // COMMENTS PARAGRAPH (only comments now)
     // ----------------------------
-    if (comments.length > 0 || flatVariations.length > 0) {
+    if (comments.length > 0) {
       var commentWrap = document.createElement("p");
       commentWrap.className = "pgn-comments";
 
@@ -218,12 +230,6 @@
         var comLine = document.createElement("div");
         comLine.textContent = comments[c];
         commentWrap.appendChild(comLine);
-      }
-
-      for (var vIdx = 0; vIdx < flatVariations.length; vIdx++) {
-        var varLine = document.createElement("div");
-        varLine.textContent = "Variation: " + flatVariations[vIdx];
-        commentWrap.appendChild(varLine);
       }
 
       wrapper.appendChild(commentWrap);
