@@ -40,16 +40,35 @@
     return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
   }
 
+  // ⭐ NEW — wrap SAN in clickable spans for StickyBoard
+  function StickyBoardWrapMoves(str) {
+    if (!str) return str;
+
+    return str.replace(
+      /(O-O-O|O-O|[KQRBN]|♔|♕|♖|♗|♘)?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O/g,
+      function (match) {
+        return '<span class="sticky-extra-move">' + match + '</span>';
+      }
+    );
+  }
+
+  // ====================================================
+  //              PGN MOVETEXT PARSER
+  // ====================================================
   function parseMovetext(movetext) {
     var events = [];
     var sanitizedParts = [];
-    var i = 0, n = movetext.length;
+    var i = 0,
+      n = movetext.length;
     var currentPly = 0;
     var varDepth = 0;
 
     while (i < n) {
       var ch = movetext.charAt(i);
 
+      // ============================
+      // COMMENTS {...}
+      // ============================
       if (ch === "{") {
         i++;
         var start = i;
@@ -57,13 +76,12 @@
         var raw = movetext.substring(start, i).trim();
 
         if (raw.indexOf("[D]") !== -1) {
-          var isSmall = (varDepth > 0);
-
+          var isSmall = varDepth > 0;
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
-            small: isSmall
+            small: isSmall,
           });
 
           var cleaned = raw.replace(/\[D\]/g, "").trim();
@@ -72,7 +90,7 @@
               type: "comment",
               text: cleaned,
               plyIndex: currentPly,
-              depth: varDepth
+              depth: varDepth,
             });
           }
         } else {
@@ -80,14 +98,17 @@
             type: "comment",
             text: raw,
             plyIndex: currentPly,
-            depth: varDepth
+            depth: varDepth,
           });
         }
 
-        if (i < n && movetext.charAt(i) === "}") i++;
+        if (movetext.charAt(i) === "}") i++;
         continue;
       }
 
+      // ============================
+      // VARIATIONS (...)
+      // ============================
       if (ch === "(") {
         varDepth++;
         i++;
@@ -104,12 +125,13 @@
         var innerEnd = i - 1;
         var inner = movetext.substring(innerStart, innerEnd).trim();
 
+        // Nested [D] inside variation
         if (/\{[^}]*\[D\][^}]*\}/.test(inner)) {
           var commentRegex = /\{([^}]*)\}/;
           var cm = inner.match(commentRegex);
-          var innerBefore = "";
-          var innerAfter = "";
-          var rawComment = "";
+          var innerBefore = "",
+            innerAfter = "",
+            rawComment = "";
 
           if (cm) {
             rawComment = cm[1].trim();
@@ -121,25 +143,24 @@
 
           var parts = rawComment.split("[D]");
           var commentBefore = (parts[0] || "").trim();
-          var commentAfter  = (parts[1] || "").trim();
+          var commentAfter = (parts[1] || "").trim();
 
           events.push({
             type: "variation_head",
             plyIndex: currentPly,
             depth: varDepth,
             headMoves: innerBefore,
-            headComment: commentBefore
+            headComment: commentBefore,
           });
 
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
-            small: true
+            small: true,
           });
 
-          var allMoves = (innerBefore ? innerBefore + " " : "") +
-                         (innerAfter || "");
+          var allMoves = (innerBefore ? innerBefore + " " : "") + (innerAfter || "");
           allMoves = allMoves.trim();
 
           events.push({
@@ -147,23 +168,21 @@
             plyIndex: currentPly,
             depth: varDepth,
             tailComment: commentAfter,
-            allMoves: allMoves
+            allMoves: allMoves,
           });
-
         } else if (/^\[D\]$/.test(inner)) {
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
-            small: false
+            small: false,
           });
-
         } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
           events.push({
             type: "variation",
             text: inner,
             plyIndex: currentPly,
-            depth: varDepth
+            depth: varDepth,
           });
         }
 
@@ -183,6 +202,7 @@
         if (/\s/.test(c3) || c3 === "{" || c3 === "(" || c3 === ")") break;
         i++;
       }
+
       var tok = movetext.substring(startTok, i);
       sanitizedParts.push(tok + " ");
 
@@ -191,23 +211,28 @@
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
 
       if (
-        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/
-          .test(tok)
+        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(
+          tok
+        )
       ) {
         currentPly++;
       }
     }
 
     var sanitized = sanitizedParts.join(" ").replace(/\s+/g, " ").trim();
-    return { sanitized: sanitized, events: events };
+    return { sanitized, events };
   }
 
+  // ====================================================
+  //              RENDER PGN ELEMENT
+  // ====================================================
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
     var raw = el.textContent.trim();
     var lines = raw.split(/\r?\n/);
-    var headerLines = [], movetextLines = [];
+    var headerLines = [],
+      movetextLines = [];
     var inHeader = true;
 
     for (var li = 0; li < lines.length; li++) {
@@ -231,10 +256,7 @@
       (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + sanitized;
 
     var game = new Chess();
-    if (!game.load_pgn(cleanedPGN, { sloppy: true })) {
-      console.warn("pgn.js: could not parse PGN");
-      return;
-    }
+    if (!game.load_pgn(cleanedPGN, { sloppy: true })) return;
 
     var headers = game.header();
     var moves = game.history({ verbose: true });
@@ -243,7 +265,7 @@
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    wrapper._pgnHistory = moves;   // ⭐ NEW: EXPORT MOVE LIST FOR STICKYBOARD
+    wrapper._pgnHistory = moves;
 
     var white =
       (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
@@ -276,7 +298,7 @@
     for (var mi = 0; mi < moves.length; mi++) {
       var m = moves[mi];
       var moveNumber = Math.floor(mi / 2) + 1;
-      var isWhite = (m.color === "w");
+      var isWhite = m.color === "w";
 
       var prefix = "";
       if (isWhite) prefix = moveNumber + ". ";
@@ -292,14 +314,13 @@
 
       currentPly++;
 
-      while (eventIdx < events.length &&
-             events[eventIdx].plyIndex === currentPly) {
-
+      while (
+        eventIdx < events.length &&
+        events[eventIdx].plyIndex === currentPly
+      ) {
         insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
-
         currentP = document.createElement("p");
         wrapper.appendChild(currentP);
-
         eventIdx++;
       }
     }
@@ -320,8 +341,10 @@
     }
   }
 
+  // ====================================================
+  //               INSERT EVENT BLOCKS
+  // ====================================================
   function insertEventBlock(wrapper, ev, index, plyIndex, game) {
-
     if (ev.type === "diagram") {
       var temp = new Chess();
       var fullHistory = game.history({ verbose: true });
@@ -345,7 +368,7 @@
       div.style.width = ev.small ? "250px" : "340px";
 
       if (ev.depth > 0) {
-        div.style.marginLeft = (ev.depth * 1.5) + "rem";
+        div.style.marginLeft = ev.depth * 1.5 + "rem";
       }
 
       wrapper.appendChild(div);
@@ -357,7 +380,7 @@
         Chessboard(target, {
           position: temp.fen(),
           draggable: false,
-          pieceTheme: PIECE_THEME_URL
+          pieceTheme: PIECE_THEME_URL,
         });
       }, 0);
 
@@ -365,21 +388,20 @@
     }
 
     var p = document.createElement("p");
-    p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
+    p.className = ev.type === "comment" ? "pgn-comment" : "pgn-variation";
+    p.style.fontSize = "0.8rem";
 
     var depth = ev.depth || 0;
     if (depth > 0) {
-      p.style.marginLeft = (depth * 1.5) + "rem";
+      p.style.marginLeft = depth * 1.5 + "rem";
     }
 
     var text = "";
 
     if (ev.type === "comment") {
       text = ev.text || "";
-
     } else if (ev.type === "variation") {
       text = ev.text || "";
-
     } else if (ev.type === "variation_head") {
       var s1 = ev.headMoves || "";
       if (ev.headComment) {
@@ -387,7 +409,6 @@
         s1 += ev.headComment;
       }
       text = s1;
-
     } else if (ev.type === "variation_tail") {
       var s2 = ev.tailComment || "";
       if (ev.allMoves) {
@@ -397,15 +418,18 @@
       text = s2;
     }
 
-    p.textContent = normalizeResult(text);
+    // ⭐ clickable SAN inside variations/comments
+    p.innerHTML = StickyBoardWrapMoves(normalizeResult(text));
+
     wrapper.appendChild(p);
   }
 
+  // ====================================================
+  //              RENDER ALL
+  // ====================================================
   function renderAll(root) {
     var nodes = (root || document).querySelectorAll("pgn");
-    for (var i = 0; i < nodes.length; i++) {
-      renderPGNElement(nodes[i], i);
-    }
+    for (var i = 0; i < nodes.length; i++) renderPGNElement(nodes[i], i);
   }
 
   function init() {
@@ -413,12 +437,11 @@
     window.PGNRenderer = {
       run: function (root) {
         renderAll(root || document.body);
-      }
+      },
     };
   }
 
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", init);
   else init();
-
 })();
