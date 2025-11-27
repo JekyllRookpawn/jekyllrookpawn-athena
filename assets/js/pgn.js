@@ -279,11 +279,11 @@
       div.id = id;
       wrapper.appendChild(div);
 
-      Chessboard(id, {
-        position: temp.fen(),
-        draggable: false,
-        pieceTheme: PIECE_THEME_URL
-      });
+    Chessboard(document.getElementById(id), {
+  position: temp.fen(),
+  draggable: false,
+  pieceTheme: PIECE_THEME_URL
+});
 
       return;
     }
