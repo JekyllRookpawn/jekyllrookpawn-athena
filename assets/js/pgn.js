@@ -21,13 +21,13 @@
     if (!dateStr) return "";
     var parts = dateStr.split(".");
     if (!parts.length) return "";
-    var year = parts[0];
-    return /^\d{4}$/.test(year) ? year : "";
+    var y = parts[0];
+    return /^\d{4}$/.test(y) ? y : "";
   }
 
-  // --- NAG FORMATTING -----------------------------------------
+  // --- NAG FORMATTING: ! ? !! ?? !? ?! --------------------------
   function formatNAGs(sanText) {
-    // Order matters: check longest first
+    // Longest first to avoid partial matches
     sanText = sanText.replace(/!!/, '<span class="nag nag-brilliant">!!</span>');
     sanText = sanText.replace(/\?\?/, '<span class="nag nag-blunder">??</span>');
     sanText = sanText.replace(/!\?/, '<span class="nag nag-interesting">!?</span>');
@@ -37,9 +37,10 @@
     return sanText;
   }
 
-  // --- Parse movetext and build event list ---------------------
+  // --- Parse movetext and build event list ----------------------
+  // events: { type, text, plyIndex, depth }
   function parseMovetext(movetext) {
-    var events = [];   // {type, text, plyIndex, depth?}
+    var events = [];
     var sanitizedParts = [];
     var i = 0;
     var n = movetext.length;
@@ -59,7 +60,8 @@
           events.push({
             type: "comment",
             text: comment,
-            plyIndex: currentPly
+            plyIndex: currentPly,
+            depth: 0 // depth fixed below via inheritance
           });
         }
         if (i < n && movetext.charAt(i) === "}") i++;
@@ -71,18 +73,19 @@
         varDepth++;
         i++;
         var innerStart = i;
-        var depth = 1;
+        var depthNow = 1;
 
-        while (i < n && depth > 0) {
+        while (i < n && depthNow > 0) {
           var c2 = movetext.charAt(i);
-          if (c2 === "(") depth++;
-          else if (c2 === ")") depth--;
+          if (c2 === "(") depthNow++;
+          else if (c2 === ")") depthNow--;
           i++;
         }
 
         var innerEnd = i - 1;
         var varText = movetext.substring(innerStart, innerEnd).trim();
 
+        // Must contain a SAN-like token to count as variation
         if (/(O-O|O-O-O|[KQRBN][a-h1-8]|[a-h][1-8]|^\d+\.)/.test(varText)) {
           events.push({
             type: "variation",
@@ -115,18 +118,19 @@
 
       // Detect SAN move
       if (/^\d+\.+$/.test(tok)) continue; // move number
-      if (/^\$\d+$/.test(tok)) continue;  // NAG like $1
+      if (/^\$\d+$/.test(tok)) continue;  // NAG
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue; // result
 
       if (
-        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(tok)
+        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(
+          tok
+        )
       ) {
         currentPly++;
       }
     }
 
-    var sanitized = sanitizedParts.join(" ");
-    sanitized = sanitized.replace(/\s+/g, " ").trim();
+    var sanitized = sanitizedParts.join(" ").replace(/\s+/g, " ").trim();
 
     return {
       sanitized: sanitized,
@@ -134,13 +138,13 @@
     };
   }
 
-  // --- MAIN RENDER FUNCTION -----------------------------------
+  // --- MAIN RENDER FUNCTION -------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
     var raw = el.textContent.trim();
 
-    // Split header & movetext
+    // Split headers & movetext
     var lines = raw.split(/\r?\n/);
     var headerLines = [];
     var movetextLines = [];
@@ -162,19 +166,19 @@
 
     var movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
 
-    // Parse text
+    // Parse movetext for events + sanitized version
     var parsed = parseMovetext(movetext);
     var sanitizedMovetext = parsed.sanitized;
     var events = parsed.events;
 
-    // Build “clean” PGN for chess.js
-    var sanitizedPGN =
-      (headerLines.length ? headerLines.join("\n") + "\n\n" : "") +
+    // Build PGN for chess.js
+    var cleanedPGN =
+      (headerLines.length > 0 ? headerLines.join("\n") + "\n\n" : "") +
       sanitizedMovetext;
 
     var game = new Chess();
-    if (!game.load_pgn(sanitizedPGN, { sloppy: true })) {
-      console.warn("pgn.js: could not parse PGN");
+    if (!game.load_pgn(cleanedPGN, { sloppy: true })) {
+      console.warn("pgn.js: Could not parse PGN");
       return;
     }
 
@@ -182,7 +186,7 @@
     var result = normalizeResult(headers.Result || "");
     var moves = game.history({ verbose: true });
 
-    // Player strings
+    // Player lines
     var white =
       (headers.WhiteTitle || "") + " " + (headers.White || "") +
       (headers.WhiteElo ? " (" + headers.WhiteElo + ")" : "");
@@ -193,9 +197,8 @@
       (headers.BlackElo ? " (" + headers.BlackElo + ")" : "");
     black = black.trim();
 
-    // Event string
-    var year = extractYear(headers.Date);
     var eventName = headers.Event || "";
+    var year = extractYear(headers.Date);
     var eventLine = eventName + (year ? ", " + year : "");
 
     // Wrapper
@@ -211,34 +214,48 @@
     var currentP = null;
     var lastMoveSpan = null;
 
-    // First: events before move 1
+    // Render events tied to plyIndex 0
     while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
       var e0 = events[eventIdx];
       var p0 = document.createElement("p");
-      p0.className = (e0.type === "comment" ? "pgn-comment" : "pgn-variation");
-      if (e0.type === "variation" && e0.depth) {
+      p0.className =
+        e0.type === "comment" ? "pgn-comment" : "pgn-variation";
+
+      // Comments inherit indentation from nearest earlier variation
+      if (e0.depth) {
         p0.style.marginLeft = (e0.depth * 1.5) + "rem";
+      } else {
+        var inheritedDepth = 0;
+        for (var back = eventIdx - 1; back >= 0; back--) {
+          if (events[back].type === "variation" && events[back].depth) {
+            inheritedDepth = events[back].depth;
+            break;
+          }
+        }
+        if (inheritedDepth > 0) {
+          p0.style.marginLeft = (inheritedDepth * 1.5) + "rem";
+        }
       }
+
       p0.textContent = normalizeResult(e0.text);
       wrapper.appendChild(p0);
       eventIdx++;
     }
 
-    // Start first moves paragraph
+    // Start main move paragraph
     currentP = document.createElement("p");
     wrapper.appendChild(currentP);
 
-    // Main move loop
+    // MAIN MOVE LOOP
     for (var mi = 0; mi < moves.length; mi++) {
       var m = moves[mi];
       var isWhite = (m.color === "w");
       var moveNumber = Math.floor(mi / 2) + 1;
 
-      // ---- sanitize & format NAGs ----
-      var sanStr = m.san;
-      sanStr = formatNAGs(sanStr);
+      // Format SAN + NAGs
+      var sanStr = formatNAGs(m.san);
 
-      // Determine prefix (fix for black moves after comment)
+      // Determine prefix (fix for black moves after comments/variations)
       var prefix = "";
       if (isWhite) {
         prefix = moveNumber + ". ";
@@ -255,16 +272,34 @@
 
       currentPly++;
 
-      // Insert events tied to this ply
+      // Insert events for this ply
       while (eventIdx < events.length &&
              events[eventIdx].plyIndex === currentPly) {
 
         var ev = events[eventIdx];
-        var ep = document.createElement("p");
-        ep.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
 
+        var ep = document.createElement("p");
+        ep.className =
+          ev.type === "comment" ? "pgn-comment" : "pgn-variation";
+
+        // --- NEW COMMENT INDENT FIX ---
         if (ev.type === "variation" && ev.depth) {
           ep.style.marginLeft = (ev.depth * 1.5) + "rem";
+        } else {
+          // comment: inherit indentation from nearest previous variation
+          var inheritedDepth = ev.depth;
+          if (!inheritedDepth) {
+            inheritedDepth = 0;
+            for (var b = eventIdx - 1; b >= 0; b--) {
+              if (events[b].type === "variation" && events[b].depth) {
+                inheritedDepth = events[b].depth;
+                break;
+              }
+            }
+          }
+          if (inheritedDepth > 0) {
+            ep.style.marginLeft = (inheritedDepth * 1.5) + "rem";
+          }
         }
 
         ep.textContent = normalizeResult(ev.text);
@@ -284,21 +319,24 @@
         lastMoveSpan.innerHTML.trim() + " " + result;
     }
 
-    // Remove empty last <p>
+    // Remove empty trailing <p>
     if (currentP && currentP.textContent.trim() === "") {
       wrapper.removeChild(currentP);
     }
 
+    // Replace original <pgn>
     el.replaceWith(wrapper);
 
-    // Run figurine converter on this block
+    // Apply figurine conversion
     if (window.ChessFigurine && window.ChessFigurine.run) {
       ChessFigurine.run(wrapper);
     }
   }
 
+  // --------------------------------------------------------------
   function renderAll(root) {
-    var nodes = (root || document).querySelectorAll("pgn");
+    var scope = root || document;
+    var nodes = scope.querySelectorAll("pgn");
     for (var i = 0; i < nodes.length; i++) {
       renderPGNElement(nodes[i], i);
     }
