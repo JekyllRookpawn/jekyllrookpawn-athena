@@ -382,7 +382,7 @@
     p.className = isComment ? "pgn-comment" : "pgn-variation";
 
     // ⭐ NEW: smaller font
-    p.style.fontSize = "0.8rem";
+    p.style.fontSize = "0.95rem";
 
     var depth = ev.depth || 0;
     if (depth > 0) {
