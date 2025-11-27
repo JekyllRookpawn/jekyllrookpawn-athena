@@ -48,7 +48,7 @@
     var sanitizedParts = [];
     var i = 0, n = movetext.length;
     var currentPly = 0;
-    var varDepth = 0;
+    var varDepth = 0; // Tracks variation nesting depth
 
     while (i < n) {
       var ch = movetext.charAt(i);
@@ -60,21 +60,23 @@
         while (i < n && movetext.charAt(i) !== "}") i++;
         var raw = movetext.substring(start, i).trim();
 
-        // If comment contains one or more [D], make diagram(s)
+        // Comment containing diagram(s)
         if (raw.indexOf("[D]") !== -1) {
 
-          // Create a diagram event
+          // SMALL ONLY if inside variation
+          var isSmall = (varDepth > 0);
+
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
-            small: varDepth > 0 // small if inside variation
+            small: isSmall
           });
 
-          // Remove all [D] markers from comment
+          // Remove [D] occurrences
           var cleaned = raw.replace(/\[D\]/g, "").trim();
 
-          // If comment still has text, keep it
+          // Keep remaining comment text
           if (cleaned.length > 0) {
             events.push({
               type: "comment",
@@ -114,20 +116,21 @@
         var innerEnd = i - 1;
         var inner = movetext.substring(innerStart, innerEnd).trim();
 
-        // Variation containing diagrams
+        // Variation containing a diagram
         if (inner.indexOf("[D]") !== -1) {
 
-          // Diagram event
+          // Variation-level diagram = NORMAL SIZE
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
-            small: true // always small in variations
+            small: false
           });
 
           // Remove [D] from variation text
           var cleanedInner = inner.replace(/\[D\]/g, "").trim();
 
+          // If some variation text remains, keep it
           if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(cleanedInner)) {
             events.push({
               type: "variation",
@@ -138,14 +141,12 @@
           }
 
         } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
-
           events.push({
             type: "variation",
             text: inner,
             plyIndex: currentPly,
             depth: varDepth
           });
-
         }
 
         varDepth--;
@@ -169,14 +170,14 @@
       var tok = movetext.substring(startTok, i);
       sanitizedParts.push(tok + " ");
 
-      // SAN detection → increments ply count
-      if (/^\d+\.+$/.test(tok)) continue;         // move number
-      if (/^\$\d+$/.test(tok)) continue;          // NAG
+      // SAN detection → increments ply
+      if (/^\d+\.+$/.test(tok)) continue;
+      if (/^\$\d+$/.test(tok)) continue;
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
 
       if (
         /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/
-        .test(tok)
+          .test(tok)
       ) {
         currentPly++;
       }
@@ -186,7 +187,7 @@
     return { sanitized: sanitized, events: events };
   }
 
-  // ---- Main PGN renderer ----------------------------------------
+  // ---- MAIN RENDERER -------------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
@@ -195,10 +196,10 @@
     var headerLines = [], movetextLines = [];
     var inHeader = true;
 
-    // Split header vs movetext
+    // Split header / moves
     for (var li = 0; li < lines.length; li++) {
       var t = lines[li].trim();
-      if (inHeader && t.startsWith("[") && t.indexOf("]") !== -1) {
+      if (inHeader && t.startsWith("[") && t.endsWith("]")) {
         headerLines.push(lines[li]);
       } else if (inHeader && t === "") {
         inHeader = false;
@@ -211,13 +212,11 @@
     var movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
 
     var parsed = parseMovetext(movetext);
-    var sanitizedMovetext = parsed.sanitized;
+    var sanitized = parsed.sanitized;
     var events = parsed.events;
 
-    // Build cleaned PGN
     var cleanedPGN =
-      (headerLines.length ? headerLines.join("\n") + "\n\n" : "") +
-      sanitizedMovetext;
+      (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + sanitized;
 
     var game = new Chess();
     if (!game.load_pgn(cleanedPGN, { sloppy: true })) {
@@ -226,10 +225,12 @@
     }
 
     var headers = game.header();
-    var result = normalizeResult(headers.Result || "");
     var moves = game.history({ verbose: true });
+    var result = normalizeResult(headers.Result || "");
 
-    // Header block
+    var wrapper = document.createElement("div");
+    wrapper.className = "pgn-blog-block";
+
     var white =
       (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
       flipName(headers.White || "") +
@@ -243,32 +244,27 @@
     var year = extractYear(headers.Date);
     var eventLine = (headers.Event || "") + (year ? ", " + year : "");
 
-    var wrapper = document.createElement("div");
-    wrapper.className = "pgn-blog-block";
-
     var h3 = document.createElement("h3");
     h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
     var currentPly = 0;
     var eventIdx = 0;
-    var currentP = null;
+    var currentP = document.createElement("p");
+    wrapper.appendChild(currentP);
     var lastMoveSpan = null;
 
-    // Events before move 1
+    // Events at ply 0
     while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
       insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
       eventIdx++;
     }
 
-    currentP = document.createElement("p");
-    wrapper.appendChild(currentP);
-
-    // ---- MAIN MOVES LOOP ----
+    // ---- MOVES LOOP ----
     for (var mi = 0; mi < moves.length; mi++) {
       var m = moves[mi];
-      var isWhite = (m.color === "w");
       var moveNumber = Math.floor(mi / 2) + 1;
+      var isWhite = (m.color === "w");
 
       var prefix = "";
       if (isWhite) prefix = moveNumber + ". ";
@@ -281,7 +277,7 @@
 
       currentPly++;
 
-      // Insert events for this ply
+      // Insert events after this ply
       while (eventIdx < events.length &&
              events[eventIdx].plyIndex === currentPly) {
 
@@ -294,13 +290,13 @@
       }
     }
 
-    // Append game result
+    // Append game result to last move
     if (result && lastMoveSpan) {
       lastMoveSpan.innerHTML =
         lastMoveSpan.innerHTML.trim() + " " + result;
     }
 
-    // Remove empty last paragraph
+    // Remove empty last P
     if (currentP && currentP.textContent.trim() === "") {
       wrapper.removeChild(currentP);
     }
@@ -312,7 +308,7 @@
     }
   }
 
-  // ---- Handle comments, variations, diagrams ---------------------
+  // ---- EVENT INSERTION -----------------------------------------
   function insertEventBlock(wrapper, ev, index, plyIndex, game) {
 
     // ---- DIAGRAM EVENT ----
@@ -337,7 +333,7 @@
       div.className = "pgn-diagram";
       div.id = id;
 
-      // Size control
+      // Small or normal size
       if (ev.small) {
         div.style.width = "250px";
       } else {
@@ -346,13 +342,10 @@
 
       wrapper.appendChild(div);
 
-      // Delay until DOM update is complete
+      // Delay for DOM availability
       setTimeout(function () {
         var target = document.getElementById(id);
-        if (!target) {
-          console.error("Diagram DIV not found:", id);
-          return;
-        }
+        if (!target) return;
 
         Chessboard(target, {
           position: temp.fen(),
@@ -368,7 +361,7 @@
     var p = document.createElement("p");
     p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
 
-    // Indentation (for nested variations)
+    // Indentation for nested variations
     var depth = ev.depth || 0;
     if (depth > 0) {
       p.style.marginLeft = (depth * 1.5) + "rem";
