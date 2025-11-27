@@ -9,12 +9,12 @@ FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+
 Automatic FEN to chess diagram generator works with the below Markdown syntax:
 
 ```
-<FEN>[fen]</FEN>
+<fen>[fen]</fen>
 ```
 
 Replace "[fen]" with a valid FEN and the result will be a diagram:
 
-<FEN>r2qk2r/pb1p1pp1/2p4p/4p3/3bP3/2N5/PPP2PPP/R1BQR1K1 w kq - 0 14</FEN>
+<fen>r2qk2r/pb1p1pp1/2p4p/4p3/3bP3/2N5/PPP2PPP/R1BQR1K1 w kq - 0 14</fen>
 
 All diagrams are automatically sized to 400px in all pages.
 
