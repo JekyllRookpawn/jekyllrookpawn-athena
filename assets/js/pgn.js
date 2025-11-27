@@ -6,18 +6,9 @@
     "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
 
   function ensureDeps() {
-    if (typeof Chess === "undefined") {
-      console.warn("pgn.js: chess.js missing");
-      return false;
-    }
-    if (typeof Chessboard === "undefined") {
-      console.warn("pgn.js: chessboard.js missing");
-      return false;
-    }
-    return true;
+    return !(typeof Chess === "undefined" || typeof Chessboard === "undefined");
   }
 
-  // Convert 1/2-1/2 into ½-½
   function normalizeResult(str) {
     if (!str) return "";
     return str.replace(/1\/2-1\/2/g, "½-½");
@@ -48,21 +39,33 @@
     if (!dateStr) return "";
     var parts = dateStr.split(".");
     if (!parts.length) return "";
-    var year = parts[0];
-    if (!/^\d{4}$/.test(year)) return "";
-    return year;
+    if (/^\d{4}$/.test(parts[0])) return parts[0];
+    return "";
+  }
+
+  // Strip comments but store them
+  function extractComments(raw) {
+    var comments = [];
+    var cleaned = raw.replace(/\{([^}]+)\}/g, function (_, text) {
+      comments.push(text.trim());
+      return "";
+    });
+    return { cleaned: cleaned, comments: comments };
   }
 
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
     var raw = el.textContent.trim();
-
-    // Normalize result inside raw PGN first
     raw = normalizeResult(raw);
 
+    // Extract comments
+    var extraction = extractComments(raw);
+    var strippedPGN = extraction.cleaned;
+    var comments = extraction.comments;
+
     var game = new Chess();
-    var ok = game.load_pgn(raw, { sloppy: true });
+    var ok = game.load_pgn(strippedPGN, { sloppy: true });
 
     if (!ok) {
       console.warn("pgn.js: Could not parse PGN");
@@ -86,7 +89,6 @@
 
     var eventName = headers.Event || "";
     var year = extractYear(headers.Date);
-
     var eventLine = eventName + (year ? ", " + year : "");
 
     var moves = game.history({ verbose: true });
@@ -95,20 +97,16 @@
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    // ------------------------------------
-    // Single h3 with <br>
-    // ------------------------------------
+    // Heading
     var h3 = document.createElement("h3");
     h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
-    // ------------------------------------
-    // Half index
-    // ------------------------------------
+    // Middle index
     var half = Math.floor(moves.length / 2);
 
     // ------------------------------------
-    // FIRST PARAGRAPH (moves before diagram)
+    // FIRST HALF MOVES
     // ------------------------------------
     var p1 = document.createElement("p");
 
@@ -127,7 +125,7 @@
     wrapper.appendChild(p1);
 
     // ------------------------------------
-    // DIAGRAM
+    // MID DIAGRAM
     // ------------------------------------
     game.reset();
     for (var x = 0; x < half; x++) {
@@ -144,7 +142,23 @@
     queueBoard(midId, midFen);
 
     // ------------------------------------
-    // SECOND PARAGRAPH (moves after diagram)
+    // COMMENTS paragraph (if any)
+    // ------------------------------------
+    if (comments.length > 0) {
+      var commentWrap = document.createElement("p");
+      commentWrap.className = "pgn-comments";
+
+      for (var c = 0; c < comments.length; c++) {
+        var line = document.createElement("div");
+        line.textContent = comments[c];
+        commentWrap.appendChild(line);
+      }
+
+      wrapper.appendChild(commentWrap);
+    }
+
+    // ------------------------------------
+    // SECOND HALF MOVES
     // ------------------------------------
     var p2 = document.createElement("p");
 
@@ -157,41 +171,33 @@
       span2.textContent = isWhite2
         ? moveNo2 + ". " + mm.san + " "
         : mm.san + " ";
-
       p2.appendChild(span2);
     }
 
-    // ------------------------------------
-    // APPEND RESULT TO LAST MOVE, not a new paragraph
-    // ------------------------------------
+    // Append result to last move
     if (result) {
-      var lastSpan = p2.lastChild;
-      if (lastSpan) {
-        lastSpan.textContent = lastSpan.textContent.trim() + " " + result;
+      var last = p2.lastChild;
+      if (last) {
+        last.textContent = last.textContent.trim() + " " + result;
       }
     }
 
     wrapper.appendChild(p2);
 
-    // Replace <pgn>
     el.replaceWith(wrapper);
 
     initAllBoards();
 
-    // Figurine conversion
     if (window.ChessFigurine && window.ChessFigurine.run) {
       ChessFigurine.run(wrapper);
     }
   }
 
   function renderAll(root) {
-    var scope = root || document;
-    var nodes = scope.querySelectorAll("pgn");
-
+    var nodes = (root || document).querySelectorAll("pgn");
     for (var i = 0; i < nodes.length; i++) {
       renderPGNElement(nodes[i], i);
     }
-
     initAllBoards();
   }
 
@@ -204,9 +210,7 @@
     };
   }
 
-  if (document.readyState === "loading") {
+  if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  else init();
 })();
