@@ -17,7 +17,6 @@
     return true;
   }
 
-  // Queue diagrams, initialize after DOM injection
   var pendingBoards = [];
 
   function queueBoard(id, fen) {
@@ -57,6 +56,7 @@
     }
 
     var headers = game.header();
+    var result = headers.Result || "";
 
     var white = [
       headers.WhiteTitle || "",
@@ -76,38 +76,38 @@
     var moves = game.history({ verbose: true });
     game.reset();
 
-    // Outer wrapper
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    // H2
-    var h2 = document.createElement("h2");
-    h2.textContent = white + " – " + black;
-    wrapper.appendChild(h2);
+    // -------------------------------------
+    // BOTH HEADINGS ARE NOW H3 (smaller)
+    // -------------------------------------
 
-    // H3
-    var h3 = document.createElement("h3");
-    h3.textContent = year ? eventName + ", " + year : eventName;
-    wrapper.appendChild(h3);
+    // Player names
+    var h3a = document.createElement("h3");
+    h3a.textContent = white + " – " + black;
+    wrapper.appendChild(h3a);
 
-    // Determine halfway move index
+    // Event + year
+    var h3b = document.createElement("h3");
+    h3b.textContent = year ? eventName + ", " + year : eventName;
+    wrapper.appendChild(h3b);
+
+    // Determine halfway
     var half = Math.floor(moves.length / 2);
 
-    // ------------------------------------
-    // MOVES BEFORE DIAGRAM
-    // ------------------------------------
+    // -------------------------------------
+    // Moves BEFORE diagram
+    // -------------------------------------
     var p1 = document.createElement("p");
 
     for (var i = 0; i < moves.length; i++) {
       var m = moves[i];
-      var isWhite = m.color === "w";
-      var moveNo = Math.floor(i / 2) + 1;
+      var w = m.color === "w";
+      var n = Math.floor(i / 2) + 1;
 
       var span = document.createElement("span");
-      span.textContent = isWhite
-        ? moveNo + ". " + m.san + " "
-        : m.san + " ";
-
+      span.textContent = w ? n + ". " + m.san + " " : m.san + " ";
       p1.appendChild(span);
 
       if (i === half - 1) break;
@@ -115,9 +115,9 @@
 
     wrapper.appendChild(p1);
 
-    // ------------------------------------
-    // DIAGRAM AT HALFWAY POSITION
-    // ------------------------------------
+    // -------------------------------------
+    // Middle diagram
+    // -------------------------------------
     game.reset();
     for (var x = 0; x < half; x++) {
       game.move(moves[x].san);
@@ -133,30 +133,39 @@
 
     queueBoard(midId, midFen);
 
-    // ------------------------------------
-    // MOVES AFTER DIAGRAM
-    // ------------------------------------
+    // -------------------------------------
+    // Moves AFTER diagram
+    // -------------------------------------
     var p2 = document.createElement("p");
 
     for (var j = half; j < moves.length; j++) {
       var mm = moves[j];
-      var w = mm.color === "w";
-      var n = Math.floor(j / 2) + 1;
+      var w2 = mm.color === "w";
+      var n2 = Math.floor(j / 2) + 1;
 
       var s2 = document.createElement("span");
-      s2.textContent = w ? n + ". " + mm.san + " " : mm.san + " ";
+      s2.textContent = w2 ? n2 + ". " + mm.san + " " : mm.san + " ";
       p2.appendChild(s2);
     }
 
     wrapper.appendChild(p2);
 
-    // Replace original <pgn> with rendered block
+    // -------------------------------------
+    // ADD FINAL RESULT OF GAME AFTER MOVES
+    // -------------------------------------
+    if (result) {
+      var res = document.createElement("p");
+      res.className = "pgn-result";
+      res.textContent = result;
+      wrapper.appendChild(res);
+    }
+
+    // Replace original <pgn>
     el.replaceWith(wrapper);
 
-    // Initialize all queued boards
     initAllBoards();
 
-    // Apply figurine notation after rendering
+    // Convert SAN → figurines
     if (window.ChessFigurine && window.ChessFigurine.run) {
       ChessFigurine.run(wrapper);
     }
@@ -165,14 +174,17 @@
   function renderAll(root) {
     var scope = root || document;
     var nodes = scope.querySelectorAll("pgn");
+
     for (var i = 0; i < nodes.length; i++) {
       renderPGNElement(nodes[i], i);
     }
+
     initAllBoards();
   }
 
   function init() {
     renderAll(document);
+
     window.PGNRenderer = {
       run: function (root) {
         renderAll(root || document.body);
