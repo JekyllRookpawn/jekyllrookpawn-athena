@@ -5,31 +5,29 @@ date:   2025-11-11
 FEN: r2qk2r/pb1p1pp1/2p4p/4p3/3bP3/2N5/PPP2PPP/R1BQR1K1 w kq - 0 14
 ---
 
-## Marius Gramb (2142) - GM Bogdan-Daniel Deac (2690)
-### Reykjavik Open, 2024.03.15
+<pgn>
+[Event "15th London Classic Elite"]
+[Site "London ENG"]
+[Date "2025.11.26"]
+[Round "1.1"]
+[White "McShane, Luke J"]
+[Black "Adams, Michael"]
+[Result "1/2-1/2"]
+[WhiteTitle "GM"]
+[BlackTitle "GM"]
+[WhiteElo "2615"]
+[BlackElo "2635"]
+[ECO "C85"]
+[Opening "Ruy Lopez"]
+[Variation "Exchange variation doubly deferred (DERLD)"]
+[WhiteFideId "404853"]
+[BlackFideId "400041"]
+[EventDate "2025.11.26"]
 
-1\. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 e6 6. Na3 Qd8
-
-<fen>r1bq1rk1/2ppbppp/p1n2n2/1p2p3/P3P3/1B3N2/1PPP1PPP/RNBQR1K1 b - - 0 8</fen>
-  
-The most common plan here is 7. Nc2 to play 8. Bd3 next and still not letting the IQP after cxd4.
-
-7\. Nc4 Be7 8. Nce5 O-O 9. Be2
-
-<fen>r1bq1rk1/2ppbppp/p1n2n2/1p2p3/P3P3/1B3N2/1PPP1PPP/RNBQR1K1 b - - 0 8</fen>
-
-A new move to be able to capture with the queen, white did not play 10.Bd3.
-
-9... cxd4 10. Qxd4 Qxd4 11. Nxd4
-
- <fen>r1bq1rk1/2ppbppp/p1n2n2/1p2p3/P3P3/1B3N2/1PPP1PPP/RNBQR1K1 b - - 0 8</fen>
-
-A rather typical queenless middlegame position from Alapin Sicilian. Both sides have their pawn majorities on each side of the board.
-
-11... Nd5!
-
-<fen>r1bq1rk1/2ppbppp/p1n2n2/1p2p3/P3P3/1B3N2/1PPP1PPP/RNBQR1K1 b - - 0 8</fen>
-
-The first instructive moment of the game for me as 11... Nbd7 looked more normal to play. Black immediately starts moving their pawn majority by playing f6 and e5 thus avoid simplifications.
-
-[...]
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Bxc6 dxc6 7. d3 Nd7 8.
+Nbd2 O-O 9. Nc4 f6 10. Ne3 Nc5 11. Nf5 Bd6 12. Re1 Re8 13. Be3 Bf8 14. Qe2 Ne6
+15. d4 Nxd4 16. N5xd4 exd4 17. Bxd4 Be6 18. Qe3 Qe7 19. h4 c5 20. Bc3 h6 21. Nh2
+Qf7 22. Qg3 Rad8 23. Nf1 Kh7 24. b3 c4 25. Ne3 cxb3 26. axb3 Bc5 27. Qf3 c6 28.
+h5 Bd4 29. Bxd4 Rxd4 30. Red1 Red8 31. Rxd4 Rxd4 32. Nf5 Bxf5 33. Qxf5+ Kg8 34.
+Qc8+ Kh7 35. Qf5+ Kg8 36. Qc8+ Kh7 1/2-1/2
+</pgn>
