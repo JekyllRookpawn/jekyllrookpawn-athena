@@ -4,6 +4,67 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".pgn-viewer").forEach(initViewer);
 });
 
+/* ---------------- FIGURINES ---------------- */
+
+const FIGURINES = {
+  K: "♔",
+  Q: "♕",
+  R: "♖",
+  B: "♗",
+  N: "♘"
+};
+
+function sanToFigurines(san) {
+  return san.replace(/[KQRBN]/g, p => FIGURINES[p] || p);
+}
+
+/* ---------------- PGN PARSER (DISPLAY ONLY) ---------------- */
+
+function extractMovesCommentsVariations(pgn) {
+  // Remove headers
+  let body = pgn.replace(/\[.*?\]\s*/g, "");
+
+  const tokens = [];
+  let i = 0;
+
+  while (i < body.length) {
+    const char = body[i];
+
+    if (char === "{") {
+      const end = body.indexOf("}", i);
+      tokens.push({ type: "comment", text: body.slice(i + 1, end) });
+      i = end + 1;
+      continue;
+    }
+
+    if (char === "(") {
+      let depth = 1;
+      let j = i + 1;
+      while (j < body.length && depth > 0) {
+        if (body[j] === "(") depth++;
+        if (body[j] === ")") depth--;
+        j++;
+      }
+      tokens.push({ type: "variation", text: body.slice(i + 1, j - 1) });
+      i = j;
+      continue;
+    }
+
+    const moveMatch = body.slice(i).match(/^(\d+\.+)?\s*([^\s{}()]+)/);
+    if (moveMatch) {
+      tokens.push({ type: "move", san: moveMatch[2] });
+      i += moveMatch[0].length;
+      continue;
+    }
+
+    i++;
+  }
+
+  return tokens;
+}
+
+/* ---------------- PGN VIEWER ---------------- */
+
 function initViewer(container) {
   const boardEl = container.querySelector(".board");
   const pgnDisplay = container.querySelector(".pgnDisplay");
@@ -14,21 +75,24 @@ function initViewer(container) {
   const nextBtn  = container.querySelector(".nextBtn");
   const endBtn   = container.querySelector(".endBtn");
 
-  const game = new Chess();
   const rawPGN = pgnEl.textContent.trim();
   pgnEl.style.display = "none";
 
+  const game = new Chess();
   game.load_pgn(rawPGN);
-  const moves = game.history(); // SAN list
+  const moves = game.history();   // PURE SAN
   game.reset();
 
+  const displayTokens = extractMovesCommentsVariations(rawPGN);
+
   let currentMove = 0;
+  let moveCounter = 0;
 
   const board = Chessboard(boardEl, {
     position: "start",
     draggable: false,
     pieceTheme:
-      "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png"
+      "https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/1.0.0/img/chesspieces/wikipedia/{piece}.png"
   });
 
   function updateBoard() {
@@ -38,14 +102,27 @@ function initViewer(container) {
 
   function renderPGN() {
     let html = "";
+    moveCounter = 0;
 
-    moves.forEach((move, i) => {
-      if (i % 2 === 0) {
-        html += `${Math.floor(i / 2) + 1}. `;
+    displayTokens.forEach(t => {
+      if (t.type === "move") {
+        const isActive = moveCounter === currentMove - 1;
+        const san = moves[moveCounter++] ?? "";
+
+        html += `
+          <span class="pgn-move ${isActive ? "active-move" : ""}"
+                data-index="${moveCounter - 1}">
+            ${sanToFigurines(san)}
+          </span> `;
       }
 
-      const active = i === currentMove - 1 ? "active-move" : "";
-      html += `<span class="pgn-move ${active}" data-index="${i}">${move}</span> `;
+      if (t.type === "comment") {
+        html += `<span class="pgn-comment">{${t.text}}</span> `;
+      }
+
+      if (t.type === "variation") {
+        html += `<span class="pgn-variation">(${t.text})</span> `;
+      }
     });
 
     pgnDisplay.innerHTML = html;
@@ -72,37 +149,36 @@ function initViewer(container) {
     updateBoard();
   };
 
-  endBtn.onclick = () => {
-    goToMove(moves.length - 1);
-  };
+  endBtn.onclick = () => goToMove(moves.length - 1);
 
   nextBtn.onclick = () => {
-    if (currentMove >= moves.length) return;
-    game.move(moves[currentMove]);
-    currentMove++;
-    updateBoard();
+    if (currentMove < moves.length) {
+      game.move(moves[currentMove++]);
+      updateBoard();
+    }
   };
 
   prevBtn.onclick = () => {
-    if (currentMove <= 0) return;
-    game.undo();
-    currentMove--;
-    updateBoard();
+    if (currentMove > 0) {
+      game.undo();
+      currentMove--;
+      updateBoard();
+    }
   };
 
-  // Keyboard navigation (← →)
+  /* ---------- Keyboard navigation ---------- */
+
   container.addEventListener("keydown", e => {
-    if (e.key === "ArrowRight") {
+    if (["ArrowRight", "ArrowUp"].includes(e.key)) {
       e.preventDefault();
       nextBtn.click();
     }
-    if (e.key === "ArrowLeft") {
+    if (["ArrowLeft", "ArrowDown"].includes(e.key)) {
       e.preventDefault();
       prevBtn.click();
     }
   });
 
-  // focus on click
   container.addEventListener("click", () => container.focus());
 
   updateBoard();
