@@ -1,4 +1,4 @@
-/* Strictly use for pieceTheme: "https://chessboardjs.com/img/chesspieces/wiki/{piece}.png" */
+/* Strictly use for pieceTheme: "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png" */
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".pgn-viewer").forEach(initViewer);
@@ -28,7 +28,7 @@ function initViewer(container) {
     position: "start",
     draggable: false,
     pieceTheme:
-      "https://chessboardjs.com/img/chesspieces/wiki/{piece}.png"
+      "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png"
   });
 
   function updateBoard() {
