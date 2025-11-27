@@ -6,19 +6,4 @@ categories: writing
 FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7
 ---
 
-<div class="pgn-viewer" tabindex="0">
-  <div class="board"></div>
-
-  <div class="controls">
-    <button class="startBtn">&lt;&lt;</button>
-    <button class="prevBtn">&lt;</button>
-    <button class="nextBtn">&gt;</button>
-    <button class="endBtn">&gt;&gt;</button>
-  </div>
-
-  <p class="pgnDisplay"></p>
-
-  <pgn>
-1. e4 e5 2. Nf3 Nc6 3. Bb5 a6
-  </pgn>
-</div>
+<pgn>1. e4 e5 2. Nf3 Nc6 3. Bb5 a6</pgn>
