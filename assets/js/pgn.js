@@ -48,7 +48,7 @@
     var sanitizedParts = [];
     var i = 0, n = movetext.length;
     var currentPly = 0;
-    var varDepth = 0; // Tracks variation nesting depth
+    var varDepth = 0;
 
     while (i < n) {
       var ch = movetext.charAt(i);
@@ -63,7 +63,7 @@
         // Comment containing diagram(s)
         if (raw.indexOf("[D]") !== -1) {
 
-          // SMALL ONLY if inside variation
+          // SMALL only if comment inside variation
           var isSmall = (varDepth > 0);
 
           events.push({
@@ -73,21 +73,18 @@
             small: isSmall
           });
 
-          // Remove [D] occurrences
-          var cleaned = raw.replace(/\[D\]/g, "").trim();
-
-          // Keep remaining comment text
-          if (cleaned.length > 0) {
+          var cleanedText = raw.replace(/\[D\]/g, "").trim();
+          if (cleanedText.length > 0) {
             events.push({
               type: "comment",
-              text: cleaned,
+              text: cleanedText,
               plyIndex: currentPly,
               depth: 0
             });
           }
 
         } else {
-          // Normal comment
+
           events.push({
             type: "comment",
             text: raw,
@@ -113,34 +110,54 @@
           else if (c2 === ")") depth--;
           i++;
         }
+
         var innerEnd = i - 1;
         var inner = movetext.substring(innerStart, innerEnd).trim();
 
-        // Variation containing a diagram
-        if (inner.indexOf("[D]") !== -1) {
+        // ----- CASE A: comment inside variation contains [D] -----
+        if (/\{[^}]*\[D\][^}]*\}/.test(inner)) {
 
-          // Variation-level diagram = NORMAL SIZE
+          // Extract the { ... } part
+          var commentMatch = inner.match(/\{([^}]*)\}/);
+          if (commentMatch) {
+            var rawComment = commentMatch[1].trim();
+
+            events.push({
+              type: "diagram",
+              plyIndex: currentPly,
+              depth: varDepth,
+              small: true    // comment + variation => small
+            });
+
+            var cleanedComment = rawComment.replace(/\[D\]/g, "").trim();
+            if (cleanedComment.length > 0) {
+              events.push({
+                type: "comment",
+                text: cleanedComment,
+                plyIndex: currentPly,
+                depth: varDepth
+              });
+            }
+          }
+
+          // Remove the comment from variation text
+          inner = inner.replace(/\{[^}]*\}/g, "").trim();
+        }
+
+        // ----- CASE B: direct variation-level [D] → normal -----
+        if (/^\[D\]$/.test(inner)) {
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
             small: false
           });
+          varDepth--;
+          continue;
+        }
 
-          // Remove [D] from variation text
-          var cleanedInner = inner.replace(/\[D\]/g, "").trim();
-
-          // If some variation text remains, keep it
-          if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(cleanedInner)) {
-            events.push({
-              type: "variation",
-              text: cleanedInner,
-              plyIndex: currentPly,
-              depth: varDepth
-            });
-          }
-
-        } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
+        // ----- Variation text remains -----
+        if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
           events.push({
             type: "variation",
             text: inner,
@@ -170,7 +187,7 @@
       var tok = movetext.substring(startTok, i);
       sanitizedParts.push(tok + " ");
 
-      // SAN detection → increments ply
+      // SAN detection → increment ply
       if (/^\d+\.+$/.test(tok)) continue;
       if (/^\$\d+$/.test(tok)) continue;
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
@@ -196,7 +213,7 @@
     var headerLines = [], movetextLines = [];
     var inHeader = true;
 
-    // Split header / moves
+    // Extract header and moves
     for (var li = 0; li < lines.length; li++) {
       var t = lines[li].trim();
       if (inHeader && t.startsWith("[") && t.endsWith("]")) {
@@ -254,7 +271,7 @@
     wrapper.appendChild(currentP);
     var lastMoveSpan = null;
 
-    // Events at ply 0
+    // Pre-move events
     while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
       insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
       eventIdx++;
@@ -277,7 +294,7 @@
 
       currentPly++;
 
-      // Insert events after this ply
+      // Insert events matching this ply
       while (eventIdx < events.length &&
              events[eventIdx].plyIndex === currentPly) {
 
@@ -290,13 +307,13 @@
       }
     }
 
-    // Append game result to last move
+    // Append result
     if (result && lastMoveSpan) {
       lastMoveSpan.innerHTML =
         lastMoveSpan.innerHTML.trim() + " " + result;
     }
 
-    // Remove empty last P
+    // Remove empty last paragraph
     if (currentP && currentP.textContent.trim() === "") {
       wrapper.removeChild(currentP);
     }
@@ -333,7 +350,7 @@
       div.className = "pgn-diagram";
       div.id = id;
 
-      // Small or normal size
+      // Size: small or normal
       if (ev.small) {
         div.style.width = "250px";
       } else {
@@ -342,7 +359,7 @@
 
       wrapper.appendChild(div);
 
-      // Delay for DOM availability
+      // Delay for DOM commit
       setTimeout(function () {
         var target = document.getElementById(id);
         if (!target) return;
@@ -361,7 +378,6 @@
     var p = document.createElement("p");
     p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
 
-    // Indentation for nested variations
     var depth = ev.depth || 0;
     if (depth > 0) {
       p.style.marginLeft = (depth * 1.5) + "rem";
