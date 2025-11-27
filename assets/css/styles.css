@@ -27,8 +27,8 @@
   box-sizing: content-box !important; 
 }
 
-.active-move {
-  background: #ffe58a;
-  border-radius: 4px;
-  padding: 2px 4px;
+.pgn-variation {
+  margin-left: 3rem;
+  font-style: italic;
+  opacity: 0.85;
 }

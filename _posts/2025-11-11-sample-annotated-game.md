@@ -32,4 +32,4 @@ A rather typical queenless middlegame position from Alapin Sicilian. Both sides 
 
 The first instructive moment of the game for me as 11... Nbd7 looked more normal to play. Black immediately starts moving their pawn majority by playing f6 and e5 thus avoid simplifications.
 
-[...] ½-½
+[...]
