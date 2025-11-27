@@ -1,20 +1,23 @@
 // assets/js/chess/pgn.js
-// Converts <pgn>...</pgn> into a fully formatted chess blog post
+// Turn <pgn>...</pgn> into a structured chess blog post.
+// Requires chess.js and chessboard.js to be loaded first.
 
 (function () {
   "use strict";
 
-  // PIECE THEME (Wikipedia set)
-  const PIECE_THEME_URL = "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
+  const PIECE_THEME_URL =
+    "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
 
-  function parseHeaders(headerText) {
-    const headers = {};
-    const regex = /\[(\w+)\s+"([^"]*)"\]/g;
-    let m;
-    while ((m = regex.exec(headerText))) {
-      headers[m[1]] = m[2];
+  function ensureDeps() {
+    if (typeof Chess === "undefined") {
+      console.warn("pgn.js: Chess (chess.js) is not loaded.");
+      return false;
     }
-    return headers;
+    if (typeof Chessboard === "undefined") {
+      console.warn("pgn.js: Chessboard (chessboard.js) is not loaded.");
+      return false;
+    }
+    return true;
   }
 
   function extractYear(dateStr) {
@@ -23,23 +26,29 @@
     return year || "";
   }
 
-  function createBoard(containerId, fen = "start") {
-    Chessboard(containerId, {
-      position: fen === "start" ? "start" : fen,
+  function createBoard(id, fenOrStart) {
+    Chessboard(id, {
+      position: fenOrStart === "start" ? "start" : fenOrStart,
       draggable: false,
       pieceTheme: PIECE_THEME_URL
     });
   }
 
   function renderPGNElement(el, index) {
-    const rawPGN = el.textContent.trim();
-    const chess = new Chess();
+    if (!ensureDeps()) return;
 
-    chess.loadPgn(rawPGN);
-    chess.reset();
+    const raw = el.textContent.trim();
+    if (!raw) return;
 
-    const headerSection = rawPGN.split("\n\n")[0];
-    const headers = parseHeaders(headerSection);
+    const game = new Chess();
+    const ok = game.load_pgn(raw, { sloppy: true });
+    if (!ok) {
+      console.warn("pgn.js: Could not load PGN", raw);
+      return;
+    }
+
+    // Headers from chess.js
+    const headers = game.header ? game.header() : {};
 
     const whiteTitle = headers.WhiteTitle || "";
     const whiteName = headers.White || "White";
@@ -52,102 +61,104 @@
     const event = headers.Event || "";
     const year = extractYear(headers.Date);
 
+    const whiteLine = [whiteTitle, whiteName, whiteElo].filter(Boolean).join(" ");
+    const blackLine = [blackTitle, blackName, blackElo].filter(Boolean).join(" ");
+
+    // Get moves (verbose) then reset to start for stepping
+    const moves = game.history({ verbose: true });
+    game.reset();
+
+    // Wrapper for everything
     const wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    // H2
+    // H2: players
     const h2 = document.createElement("h2");
-    h2.textContent = `${whiteTitle} ${whiteName} ${whiteElo} – ${blackTitle} ${blackName} ${blackElo}`;
+    h2.textContent = `${whiteLine} – ${blackLine}`.trim();
     wrapper.appendChild(h2);
 
-    // H3
+    // H3: event + year
     const h3 = document.createElement("h3");
-    h3.textContent = `${event}, ${year}`;
+    h3.textContent = year ? `${event}, ${year}` : event;
     wrapper.appendChild(h3);
 
-    // Start diagram
+    // Starting position diagram
     const startBoard = document.createElement("div");
-    startBoard.id = `pgn-start-board-${index}`;
+    const startBoardId = `pgn-start-board-${index}`;
+    startBoard.id = startBoardId;
     startBoard.className = "pgn-board";
     wrapper.appendChild(startBoard);
-    createBoard(startBoard.id);
+    createBoard(startBoardId, "start");
 
-    // Moves + diagrams
-    const verboseMoves = chess.history({ verbose: true });
-    chess.reset();
-
-    let moveCounter = 0;
+    // Paragraphs of moves + diagrams every 5 full moves
     let p = document.createElement("p");
+    let fullMoveCount = 0;
 
-    verboseMoves.forEach((move, i) => {
-      const displayMove = move.turn === "w"
-        ? `${move.moveNumber}. ${move.san}`
-        : `${move.san}`;
+    for (let i = 0; i < moves.length; i++) {
+      const m = moves[i];
+      const isWhite = m.color === "w";
+      const moveNumber = Math.floor(i / 2) + 1;
+
+      const text = isWhite
+        ? `${moveNumber}. ${m.san}`
+        : m.san;
 
       const span = document.createElement("span");
-      span.textContent = displayMove + " ";
+      span.textContent = text + " ";
       p.appendChild(span);
 
-      if (move.turn === "b") moveCounter++;
+      // Advance game position
+      game.move(m.san);
 
-      if (move.turn === "b" && moveCounter % 5 === 0) {
-        wrapper.appendChild(p);
+      // After each Black move, count a full move
+      if (!isWhite) {
+        fullMoveCount++;
 
-        chess.move(verboseMoves[i]);
+        if (fullMoveCount % 5 === 0) {
+          // Finish this paragraph
+          wrapper.appendChild(p);
 
-        const boardAfter = document.createElement("div");
-        const boardId = `pgn-board-${index}-${moveCounter}`;
-        boardAfter.id = boardId;
-        boardAfter.className = "pgn-board";
-        wrapper.appendChild(boardAfter);
-        createBoard(boardId, chess.fen());
+          // Insert diagram at current position
+          const boardDiv = document.createElement("div");
+          const boardId = `pgn-board-${index}-${fullMoveCount}`;
+          boardDiv.id = boardId;
+          boardDiv.className = "pgn-board";
+          wrapper.appendChild(boardDiv);
+          createBoard(boardId, game.fen());
 
-        p = document.createElement("p");
+          // Start new paragraph
+          p = document.createElement("p");
+        }
       }
-    });
+    }
 
+    // Append last paragraph if it has content
     if (p.textContent.trim().length > 0) {
       wrapper.appendChild(p);
     }
 
+    // Replace <pgn> with our generated block
     el.replaceWith(wrapper);
 
-    if (window.ChessFigurine) {
+    // Let figurine.js convert SAN to figurines inside this block
+    if (window.ChessFigurine && typeof window.ChessFigurine.run === "function") {
       window.ChessFigurine.run(wrapper);
     }
   }
 
-  function renderAllPGNs(root = document) {
-    root.querySelectorAll("pgn").forEach((el, i) => renderPGNElement(el, i));
-  }
-
-  function observeMutations() {
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.addedNodes) {
-          m.addedNodes.forEach(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              if (node.matches && node.matches("pgn")) {
-                renderAllPGNs(node.parentNode);
-              }
-              renderAllPGNs(node);
-            }
-          });
-        }
-      }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    window.PGNRenderer = {
-      run: (root) => renderAllPGNs(root || document),
-      disconnectObserver: () => observer.disconnect()
-    };
+  function renderAllPGNs(root) {
+    const scope = root || document;
+    const nodes = scope.querySelectorAll("pgn");
+    nodes.forEach((el, i) => renderPGNElement(el, i));
   }
 
   function init() {
     renderAllPGNs(document);
-    observeMutations();
+
+    // Optional: expose manual API
+    window.PGNRenderer = {
+      run: (root) => renderAllPGNs(root || document)
+    };
   }
 
   if (document.readyState === "loading") {
