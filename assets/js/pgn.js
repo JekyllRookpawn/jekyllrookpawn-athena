@@ -23,7 +23,7 @@
     return /^\d{4}$/.test(p[0]) ? p[0] : "";
   }
 
-  // ---- NAG formatting (!, ?, !!, ??, !?, ?!) --------------------
+  // ---- Format NAG symbols ---------------------------------------
   function formatNAGs(sanText) {
     sanText = sanText.replace(/!!/, '<span class="nag nag-brilliant">!!</span>');
     sanText = sanText.replace(/\?\?/, '<span class="nag nag-blunder">??</span>');
@@ -34,7 +34,7 @@
     return sanText;
   }
 
-  // "Surname, Firstname" → "Firstname Surname"
+  // ---- Flip "Surname, Firstname" → "Firstname Surname" -----------
   function flipName(name) {
     if (!name) return "";
     var idx = name.indexOf(",");
@@ -42,7 +42,7 @@
     return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
   }
 
-  // ---- Parse movetext, extract events (comments, variations, diagrams)
+  // ---- Parse movetext, detect comments/variations/diagrams -------
   function parseMovetext(movetext) {
     var events = [];
     var sanitizedParts = [];
@@ -53,20 +53,39 @@
     while (i < n) {
       var ch = movetext.charAt(i);
 
-      // COMMENT { ... }
+      // ----- COMMENT { ... } -----
       if (ch === "{") {
         i++;
         var start = i;
         while (i < n && movetext.charAt(i) !== "}") i++;
         var raw = movetext.substring(start, i).trim();
 
-        if (raw === "[D]") {
+        // If comment contains one or more [D], make diagram(s)
+        if (raw.indexOf("[D]") !== -1) {
+
+          // Create a diagram event
           events.push({
             type: "diagram",
             plyIndex: currentPly,
-            depth: varDepth
+            depth: varDepth,
+            small: varDepth > 0 // small if inside variation
           });
+
+          // Remove all [D] markers from comment
+          var cleaned = raw.replace(/\[D\]/g, "").trim();
+
+          // If comment still has text, keep it
+          if (cleaned.length > 0) {
+            events.push({
+              type: "comment",
+              text: cleaned,
+              plyIndex: currentPly,
+              depth: 0
+            });
+          }
+
         } else {
+          // Normal comment
           events.push({
             type: "comment",
             text: raw,
@@ -79,7 +98,7 @@
         continue;
       }
 
-      // VARIATION ( ... )
+      // ----- VARIATION ( ... ) -----
       if (ch === "(") {
         varDepth++;
         i++;
@@ -92,37 +111,55 @@
           else if (c2 === ")") depth--;
           i++;
         }
-
         var innerEnd = i - 1;
         var inner = movetext.substring(innerStart, innerEnd).trim();
 
-        if (inner === "[D]") {
+        // Variation containing diagrams
+        if (inner.indexOf("[D]") !== -1) {
+
+          // Diagram event
           events.push({
             type: "diagram",
             plyIndex: currentPly,
-            depth: varDepth
+            depth: varDepth,
+            small: true // always small in variations
           });
-        } else if (/(O-O|O-O-O|[KQRBN][a-h1-8]|[a-h][1-8]|^\d+\.)/.test(inner)) {
+
+          // Remove [D] from variation text
+          var cleanedInner = inner.replace(/\[D\]/g, "").trim();
+
+          if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(cleanedInner)) {
+            events.push({
+              type: "variation",
+              text: cleanedInner,
+              plyIndex: currentPly,
+              depth: varDepth
+            });
+          }
+
+        } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
+
           events.push({
             type: "variation",
             text: inner,
             plyIndex: currentPly,
             depth: varDepth
           });
+
         }
 
         varDepth--;
         continue;
       }
 
-      // Whitespace
+      // ----- Whitespace -----
       if (/\s/.test(ch)) {
         sanitizedParts.push(" ");
         i++;
         continue;
       }
 
-      // Normal token
+      // ----- Normal token -----
       var startTok = i;
       while (i < n) {
         var c3 = movetext.charAt(i);
@@ -132,9 +169,9 @@
       var tok = movetext.substring(startTok, i);
       sanitizedParts.push(tok + " ");
 
-      // Detect SAN move → count as a ply
-      if (/^\d+\.+$/.test(tok)) continue;        // 4. or 4...
-      if (/^\$\d+$/.test(tok)) continue;         // $1
+      // SAN detection → increments ply count
+      if (/^\d+\.+$/.test(tok)) continue;         // move number
+      if (/^\$\d+$/.test(tok)) continue;          // NAG
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
 
       if (
@@ -149,7 +186,7 @@
     return { sanitized: sanitized, events: events };
   }
 
-  // ---- MAIN RENDER -------------------------------------------------
+  // ---- Main PGN renderer ----------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
@@ -158,6 +195,7 @@
     var headerLines = [], movetextLines = [];
     var inHeader = true;
 
+    // Split header vs movetext
     for (var li = 0; li < lines.length; li++) {
       var t = lines[li].trim();
       if (inHeader && t.startsWith("[") && t.indexOf("]") !== -1) {
@@ -171,10 +209,12 @@
     }
 
     var movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
+
     var parsed = parseMovetext(movetext);
     var sanitizedMovetext = parsed.sanitized;
     var events = parsed.events;
 
+    // Build cleaned PGN
     var cleanedPGN =
       (headerLines.length ? headerLines.join("\n") + "\n\n" : "") +
       sanitizedMovetext;
@@ -189,6 +229,7 @@
     var result = normalizeResult(headers.Result || "");
     var moves = game.history({ verbose: true });
 
+    // Header block
     var white =
       (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
       flipName(headers.White || "") +
@@ -205,9 +246,9 @@
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    var header = document.createElement("h3");
-    header.innerHTML = white + " – " + black + "<br>" + eventLine;
-    wrapper.appendChild(header);
+    var h3 = document.createElement("h3");
+    h3.innerHTML = white + " – " + black + "<br>" + eventLine;
+    wrapper.appendChild(h3);
 
     var currentPly = 0;
     var eventIdx = 0;
@@ -226,8 +267,8 @@
     // ---- MAIN MOVES LOOP ----
     for (var mi = 0; mi < moves.length; mi++) {
       var m = moves[mi];
-      var moveNumber = Math.floor(mi / 2) + 1;
       var isWhite = (m.color === "w");
+      var moveNumber = Math.floor(mi / 2) + 1;
 
       var prefix = "";
       if (isWhite) prefix = moveNumber + ". ";
@@ -253,12 +294,13 @@
       }
     }
 
-    // Append result
+    // Append game result
     if (result && lastMoveSpan) {
       lastMoveSpan.innerHTML =
         lastMoveSpan.innerHTML.trim() + " " + result;
     }
 
+    // Remove empty last paragraph
     if (currentP && currentP.textContent.trim() === "") {
       wrapper.removeChild(currentP);
     }
@@ -270,13 +312,12 @@
     }
   }
 
-  // ---- Insert comments, variations, diagrams -------------------
+  // ---- Handle comments, variations, diagrams ---------------------
   function insertEventBlock(wrapper, ev, index, plyIndex, game) {
 
-    // ---- DIAGRAM ----
+    // ---- DIAGRAM EVENT ----
     if (ev.type === "diagram") {
 
-      // Build temp position from original game's history
       var temp = new Chess();
       var fullHistory = game.history({ verbose: true });
 
@@ -295,15 +336,24 @@
       var div = document.createElement("div");
       div.className = "pgn-diagram";
       div.id = id;
+
+      // Size control
+      if (ev.small) {
+        div.style.width = "250px";
+      } else {
+        div.style.width = "340px";
+      }
+
       wrapper.appendChild(div);
 
-      // Delay creation to ensure the node exists
+      // Delay until DOM update is complete
       setTimeout(function () {
         var target = document.getElementById(id);
         if (!target) {
           console.error("Diagram DIV not found:", id);
           return;
         }
+
         Chessboard(target, {
           position: temp.fen(),
           draggable: false,
@@ -316,8 +366,9 @@
 
     // ---- COMMENT / VARIATION ----
     var p = document.createElement("p");
-    p.className = ev.type === "comment" ? "pgn-comment" : "pgn-variation";
+    p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
 
+    // Indentation (for nested variations)
     var depth = ev.depth || 0;
     if (depth > 0) {
       p.style.marginLeft = (depth * 1.5) + "rem";
