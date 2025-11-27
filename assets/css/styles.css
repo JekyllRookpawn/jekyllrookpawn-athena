@@ -17,12 +17,33 @@ img[src*="fen.gif"] {
   box-sizing: content-box !important; 
 }
 
-.board {
-  width: 400px;
-}
-
-#board {width: 400px;}
+#board,
+.board {width: 400px;}
 .board-wrapper {max-width: 400px !important;}
 .board-wrapper * {box-sizing: content-box !important;}
-FEN {display: none;}
 
+fen {display: none;}
+
+/* assets/css/chess.css 
+
+.fen-board,
+.pgn-board {
+  max-width: 100%;
+  margin: 1rem auto;
+}
+
+.pgn-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  outline: none;
+}
+
+.pgn-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+  */

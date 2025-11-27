@@ -1,185 +1,77 @@
-/* Strictly use for pieceTheme: "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png" */
+(function () {
 
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll(".pgn-viewer").forEach(initViewer);
-});
+  function createViewer(pgnText, index) {
+    const chess = new Chess();
+    chess.loadPgn(pgnText);
 
-/* ---------------- FIGURINES ---------------- */
+    const moves = chess.history({ verbose: true });
+    chess.reset();
 
-const FIGURINES = {
-  K: "♔",
-  Q: "♕",
-  R: "♖",
-  B: "♗",
-  N: "♘"
-};
+    let current = 0;
 
-function sanToFigurines(san) {
-  return san.replace(/[KQRBN]/g, p => FIGURINES[p] || p);
-}
+    const wrapper = document.createElement("div");
+    wrapper.className = "pgn-viewer";
 
-/* ---------------- PGN PARSER (DISPLAY ONLY) ---------------- */
+    const boardEl = document.createElement("div");
+    const movesEl = document.createElement("div");
 
-function extractMovesCommentsVariations(pgn) {
-  // Remove headers
-  let body = pgn.replace(/\[.*?\]\s*/g, "");
+    boardEl.id = "pgn-board-" + index;
+    boardEl.className = "pgn-board";
+    movesEl.className = "pgn-moves";
 
-  const tokens = [];
-  let i = 0;
+    wrapper.append(boardEl, movesEl);
 
-  while (i < body.length) {
-    const char = body[i];
+    const board = Chessboard(boardEl.id, {
+      position: "start",
+      draggable: false
+    });
 
-    if (char === "{") {
-      const end = body.indexOf("}", i);
-      tokens.push({ type: "comment", text: body.slice(i + 1, end) });
-      i = end + 1;
-      continue;
+    function updateBoard() {
+      chess.reset();
+      for (let i = 0; i < current; i++) chess.move(moves[i]);
+      board.position(chess.fen());
+      highlight();
     }
 
-    if (char === "(") {
-      let depth = 1;
-      let j = i + 1;
-      while (j < body.length && depth > 0) {
-        if (body[j] === "(") depth++;
-        if (body[j] === ")") depth--;
-        j++;
-      }
-      tokens.push({ type: "variation", text: body.slice(i + 1, j - 1) });
-      i = j;
-      continue;
+    function highlight() {
+      movesEl.querySelectorAll("span").forEach((el, i) => {
+        el.classList.toggle("active", i === current - 1);
+      });
     }
 
-    const moveMatch = body.slice(i).match(/^(\d+\.+)?\s*([^\s{}()]+)/);
-    if (moveMatch) {
-      tokens.push({ type: "move", san: moveMatch[2] });
-      i += moveMatch[0].length;
-      continue;
-    }
+    moves.forEach((m, i) => {
+      const span = document.createElement("span");
+      span.className = "figurine";
+      span.textContent = m.san;
+      span.addEventListener("click", () => {
+        current = i + 1;
+        updateBoard();
+      });
+      movesEl.appendChild(span);
+    });
 
-    i++;
-  }
-
-  return tokens;
-}
-
-/* ---------------- PGN VIEWER ---------------- */
-
-function initViewer(container) {
-  const boardEl = container.querySelector(".board");
-  const pgnDisplay = container.querySelector(".pgnDisplay");
-  const pgnEl = container.querySelector("pgn");
-
-  const startBtn = container.querySelector(".startBtn");
-  const prevBtn  = container.querySelector(".prevBtn");
-  const nextBtn  = container.querySelector(".nextBtn");
-  const endBtn   = container.querySelector(".endBtn");
-
-  const rawPGN = pgnEl.textContent.trim();
-  pgnEl.style.display = "none";
-
-  const game = new Chess();
-  game.load_pgn(rawPGN);
-  const moves = game.history();   // PURE SAN
-  game.reset();
-
-  const displayTokens = extractMovesCommentsVariations(rawPGN);
-
-  let currentMove = 0;
-  let moveCounter = 0;
-
-  const board = Chessboard(boardEl, {
-    position: "start",
-    draggable: false,
-    pieceTheme:
-      "https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/1.0.0/img/chesspieces/wikipedia/{piece}.png"
-  });
-
-  function updateBoard() {
-    board.position(game.fen());
-    renderPGN();
-  }
-
-  function renderPGN() {
-    let html = "";
-    moveCounter = 0;
-
-    displayTokens.forEach(t => {
-      if (t.type === "move") {
-        const isActive = moveCounter === currentMove - 1;
-        const san = moves[moveCounter++] ?? "";
-
-        html += `
-          <span class="pgn-move ${isActive ? "active-move" : ""}"
-                data-index="${moveCounter - 1}">
-            ${sanToFigurines(san)}
-          </span> `;
+    wrapper.tabIndex = 0;
+    wrapper.addEventListener("keydown", e => {
+      if (e.key === "ArrowRight" && current < moves.length) {
+        current++;
+        updateBoard();
       }
-
-      if (t.type === "comment") {
-        html += `<span class="pgn-comment">{${t.text}}</span> `;
-      }
-
-      if (t.type === "variation") {
-        html += `<span class="pgn-variation">(${t.text})</span> `;
+      if (e.key === "ArrowLeft" && current > 0) {
+        current--;
+        updateBoard();
       }
     });
 
-    pgnDisplay.innerHTML = html;
+    ChessFigurine.render(wrapper);
+    return wrapper;
+  }
 
-    pgnDisplay.querySelectorAll(".pgn-move").forEach(span => {
-      span.onclick = () => goToMove(+span.dataset.index);
+  function renderPGNs() {
+    document.querySelectorAll("pgn").forEach((el, i) => {
+      const viewer = createViewer(el.textContent.trim(), i);
+      el.replaceWith(viewer);
     });
   }
 
-  function goToMove(index) {
-    game.reset();
-    currentMove = 0;
-
-    for (let i = 0; i <= index; i++) {
-      game.move(moves[i]);
-      currentMove++;
-    }
-    updateBoard();
-  }
-
-  startBtn.onclick = () => {
-    game.reset();
-    currentMove = 0;
-    updateBoard();
-  };
-
-  endBtn.onclick = () => goToMove(moves.length - 1);
-
-  nextBtn.onclick = () => {
-    if (currentMove < moves.length) {
-      game.move(moves[currentMove++]);
-      updateBoard();
-    }
-  };
-
-  prevBtn.onclick = () => {
-    if (currentMove > 0) {
-      game.undo();
-      currentMove--;
-      updateBoard();
-    }
-  };
-
-  /* ---------- Keyboard navigation ---------- */
-
-  container.addEventListener("keydown", e => {
-    if (["ArrowRight", "ArrowUp"].includes(e.key)) {
-      e.preventDefault();
-      nextBtn.click();
-    }
-    if (["ArrowLeft", "ArrowDown"].includes(e.key)) {
-      e.preventDefault();
-      prevBtn.click();
-    }
-  });
-
-  container.addEventListener("click", () => container.focus());
-
-  updateBoard();
-}
+  window.PGNRenderer = { render: renderPGNs };
+})();
