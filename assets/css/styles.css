@@ -22,6 +22,9 @@ img[src*="fen.gif"] {
 .board *,
 .board *::before,
 .board *::after,
+.fen-board *,
+.fen-board *::before,
+.fen-board *::after,
 .board-wrapper * {
   box-sizing: content-box !important; 
 }
