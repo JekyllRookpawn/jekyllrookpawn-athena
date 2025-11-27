@@ -27,28 +27,8 @@
   box-sizing: content-box !important; 
 }
 
-
-
-/* assets/css/chess.css 
-
-.fen-board,
-.pgn-board {
-  max-width: 100%;
-  margin: 1rem auto;
+.active-move {
+  background: #ffe58a;
+  border-radius: 4px;
+  padding: 2px 4px;
 }
-
-.pgn-viewer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  outline: none;
-}
-
-.pgn-moves {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  font-size: 1rem;
-  line-height: 1.4;
-}
-  */
