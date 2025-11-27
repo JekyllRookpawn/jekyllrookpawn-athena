@@ -79,10 +79,6 @@
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    // -------------------------------------
-    // BOTH HEADINGS ARE NOW H3 (smaller)
-    // -------------------------------------
-
     // Player names
     var h3a = document.createElement("h3");
     h3a.textContent = white + " – " + black;
