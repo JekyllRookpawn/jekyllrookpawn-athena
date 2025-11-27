@@ -27,8 +27,35 @@
   box-sizing: content-box !important; 
 }
 
+.nag { font-weight: bold; padding-left: 2px; }
+
+.nag-good { color: #1b8c1b; }
+.nag-brilliant { color: #0a5c0a; }
+
+.nag-mistake { color: #b30000; }
+.nag-blunder { color: #7a0000; }
+
+.nag-interesting { color: #005c99; }
+.nag-dubious { color: #996600; }
+
+.nag { font-weight: bold; padding-left: 2px; }
+
+.nag-good { color: #1b8c1b; }
+.nag-brilliant { color: #0a5c0a; }
+
+.nag-mistake { color: #b30000; }
+.nag-blunder { color: #7a0000; }
+
+.nag-interesting { color: #005c99; }
+.nag-dubious { color: #996600; }
+
+/* Variation indentation already handled via JS marginLeft */
 .pgn-variation {
-  margin-left: 3rem;
   font-style: italic;
-  opacity: 0.85;
+  margin: 0.25rem 0;
+}
+
+.pgn-comment {
+  font-style: italic;
+  margin: 0.25rem 0;
 }
