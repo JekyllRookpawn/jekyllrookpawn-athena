@@ -17,7 +17,12 @@
     return true;
   }
 
-  // Queue boards for initialization AFTER DOM insertion
+  // Convert 1/2-1/2 into ½-½
+  function normalizeResult(str) {
+    if (!str) return "";
+    return str.replace(/1\/2-1\/2/g, "½-½");
+  }
+
   var pendingBoards = [];
 
   function queueBoard(id, fen) {
@@ -39,7 +44,6 @@
     pendingBoards = [];
   }
 
-  // Robust year extractor from PGN Date
   function extractYear(dateStr) {
     if (!dateStr) return "";
     var parts = dateStr.split(".");
@@ -53,6 +57,10 @@
     if (!ensureDeps()) return;
 
     var raw = el.textContent.trim();
+
+    // Normalize result inside raw PGN first
+    raw = normalizeResult(raw);
+
     var game = new Chess();
     var ok = game.load_pgn(raw, { sloppy: true });
 
@@ -62,9 +70,8 @@
     }
 
     var headers = game.header();
-    var result = headers.Result || "";
+    var result = normalizeResult(headers.Result || "");
 
-    // Player names
     var white = [
       headers.WhiteTitle || "",
       headers.White || "",
@@ -82,29 +89,26 @@
 
     var eventLine = eventName + (year ? ", " + year : "");
 
-    // Moves
     var moves = game.history({ verbose: true });
     game.reset();
 
-    // Wrapper div
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
     // ------------------------------------
-    // One <h3> with <br>
+    // Single h3 with <br>
     // ------------------------------------
     var h3 = document.createElement("h3");
-    h3.innerHTML =
-      white + " – " + black + "<br>" + eventLine;
+    h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
     // ------------------------------------
-    // Find midpoint
+    // Half index
     // ------------------------------------
     var half = Math.floor(moves.length / 2);
 
     // ------------------------------------
-    // MOVES BEFORE DIAGRAM
+    // FIRST PARAGRAPH (moves before diagram)
     // ------------------------------------
     var p1 = document.createElement("p");
 
@@ -114,10 +118,7 @@
       var moveNo = Math.floor(i / 2) + 1;
 
       var span = document.createElement("span");
-      span.textContent = isWhite
-        ? moveNo + ". " + m.san + " "
-        : m.san + " ";
-
+      span.textContent = isWhite ? moveNo + ". " + m.san + " " : m.san + " ";
       p1.appendChild(span);
 
       if (i === half - 1) break;
@@ -126,7 +127,7 @@
     wrapper.appendChild(p1);
 
     // ------------------------------------
-    // DIAGRAM AT HALFWAY POSITION
+    // DIAGRAM
     // ------------------------------------
     game.reset();
     for (var x = 0; x < half; x++) {
@@ -134,7 +135,6 @@
     }
 
     var midFen = game.fen();
-
     var midId = "pgn-middle-" + index;
     var midDiv = document.createElement("div");
     midDiv.id = midId;
@@ -144,7 +144,7 @@
     queueBoard(midId, midFen);
 
     // ------------------------------------
-    // MOVES AFTER DIAGRAM
+    // SECOND PARAGRAPH (moves after diagram)
     // ------------------------------------
     var p2 = document.createElement("p");
 
@@ -161,33 +161,29 @@
       p2.appendChild(span2);
     }
 
-    wrapper.appendChild(p2);
-
     // ------------------------------------
-    // ADD FINAL RESULT BELOW MOVES
+    // APPEND RESULT TO LAST MOVE, not a new paragraph
     // ------------------------------------
     if (result) {
-      var res = document.createElement("p");
-      res.className = "pgn-result";
-      res.textContent = result;
-      wrapper.appendChild(res);
+      var lastSpan = p2.lastChild;
+      if (lastSpan) {
+        lastSpan.textContent = lastSpan.textContent.trim() + " " + result;
+      }
     }
 
-    // Replace original <pgn> tag
+    wrapper.appendChild(p2);
+
+    // Replace <pgn>
     el.replaceWith(wrapper);
 
-    // Initialize all boards
     initAllBoards();
 
-    // Convert moves to figurine notation
+    // Figurine conversion
     if (window.ChessFigurine && window.ChessFigurine.run) {
       ChessFigurine.run(wrapper);
     }
   }
 
-  // ------------------------------------
-  // Render all <pgn> blocks
-  // ------------------------------------
   function renderAll(root) {
     var scope = root || document;
     var nodes = scope.querySelectorAll("pgn");
@@ -199,12 +195,8 @@
     initAllBoards();
   }
 
-  // ------------------------------------
-  // Init
-  // ------------------------------------
   function init() {
     renderAll(document);
-
     window.PGNRenderer = {
       run: function (root) {
         renderAll(root || document.body);
