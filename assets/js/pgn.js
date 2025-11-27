@@ -1,4 +1,5 @@
-// assets/js/chess/pgn.js ½-½
+// assets/js/chess/pgn.js
+// Parse <pgn>...</pgn> blocks into structured posts with diagrams.
 
 (function () {
   "use strict";
@@ -7,8 +8,14 @@
     "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
 
   function ensure() {
-    if (typeof Chess === "undefined") return false;
-    if (typeof Chessboard === "undefined") return false;
+    if (typeof Chess === "undefined") {
+      console.warn("pgn.js: Missing chess.js");
+      return false;
+    }
+    if (typeof Chessboard === "undefined") {
+      console.warn("pgn.js: Missing chessboard.js");
+      return false;
+    }
     return true;
   }
 
@@ -16,21 +23,40 @@
     return dateStr?.split(".")[0] || "";
   }
 
-  function createBoard(id, fenOrStart) {
-    Chessboard(id, {
-      position: fenOrStart === "start" ? "start" : fenOrStart,
-      draggable: false,
-      pieceTheme: PIECE_THEME_URL
-    });
+  // ---------------------------------------
+  // DEFERRED BOARD INITIALIZATION QUEUE
+  // ---------------------------------------
+  const pendingBoards = [];
+
+  function queueBoard(id, fenOrStart) {
+    pendingBoards.push({ id, fen: fenOrStart });
   }
+
+  function initAllBoards() {
+    pendingBoards.forEach(({ id, fen }) => {
+      const el = document.getElementById(id);
+      if (el) {
+        Chessboard(id, {
+          position: fen === "start" ? "start" : fen,
+          draggable: false,
+          pieceTheme: PIECE_THEME_URL
+        });
+      } else {
+        console.warn("Board container not found:", id);
+      }
+    });
+    pendingBoards.length = 0;
+  }
+
+  // ---------------------------------------
 
   function renderPGNElement(el, index) {
     if (!ensure()) return;
 
     const raw = el.textContent.trim();
     const game = new Chess();
-    const ok = game.load_pgn(raw, { sloppy: true });
 
+    const ok = game.load_pgn(raw, { sloppy: true });
     if (!ok) {
       console.warn("pgn.js: Could not parse PGN:", raw);
       return;
@@ -51,48 +77,55 @@
     const wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
+    // H2
     const h2 = document.createElement("h2");
     h2.textContent = `${white} – ${black}`;
     wrapper.appendChild(h2);
 
+    // H3
     const h3 = document.createElement("h3");
     h3.textContent = year ? `${event}, ${year}` : event;
     wrapper.appendChild(h3);
 
-    const startDiv = document.createElement("div");
+    // START DIAGRAM
     const startId = `pgn-start-${index}`;
+    const startDiv = document.createElement("div");
     startDiv.id = startId;
     startDiv.className = "pgn-board";
     wrapper.appendChild(startDiv);
-    createBoard(startId, "start");
 
+    // Queue board creation AFTER DOM insertion
+    queueBoard(startId, "start");
+
+    // Paragraphs & diagrams every 5 full moves
     let p = document.createElement("p");
-    let fullMove = 0;
+    let fullMoveCount = 0;
 
     for (let i = 0; i < moves.length; i++) {
       const m = moves[i];
       const isWhite = m.color === "w";
-      const moveNo = Math.floor(i / 2) + 1;
-      const text = isWhite ? `${moveNo}. ${m.san}` : m.san;
+      const moveNumber = Math.floor(i / 2) + 1;
 
       const span = document.createElement("span");
-      span.textContent = text + " ";
+      span.textContent = isWhite ? `${moveNumber}. ${m.san} ` : `${m.san} `;
       p.appendChild(span);
 
       game.move(m.san);
 
       if (!isWhite) {
-        fullMove++;
-        if (fullMove % 5 === 0) {
+        fullMoveCount++;
+        if (fullMoveCount % 5 === 0) {
           wrapper.appendChild(p);
 
+          const diagId = `pgn-diag-${index}-${fullMoveCount}`;
           const diag = document.createElement("div");
-          const diagId = `pgn-diag-${index}-${fullMove}`;
           diag.id = diagId;
           diag.className = "pgn-board";
           wrapper.appendChild(diag);
 
-          createBoard(diagId, game.fen());
+          // Queue this board for later initialization
+          queueBoard(diagId, game.fen());
+
           p = document.createElement("p");
         }
       }
@@ -100,13 +133,16 @@
 
     if (p.textContent.trim()) wrapper.appendChild(p);
 
+    // Replace <pgn> with wrapper
     el.replaceWith(wrapper);
 
+    // Convert SAN → figurine after building structure
     if (window.ChessFigurine) ChessFigurine.run(wrapper);
   }
 
   function renderAll(root = document) {
     root.querySelectorAll("pgn").forEach((el, i) => renderPGNElement(el, i));
+    initAllBoards(); // <-- initialize all boards AFTER DOM is complete
   }
 
   function init() {
