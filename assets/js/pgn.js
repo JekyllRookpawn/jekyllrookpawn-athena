@@ -367,8 +367,6 @@
     var p = document.createElement("p");
     p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
 
-    p.style.fontSize = "1rem";
-
     var depth = ev.depth || 0;
     if (depth > 0) {
       p.style.marginLeft = (depth * 1.5) + "rem";
