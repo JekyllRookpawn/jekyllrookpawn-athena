@@ -23,6 +23,7 @@
     return /^\d{4}$/.test(p[0]) ? p[0] : "";
   }
 
+  // ---- NAG formatting (!, ?, !!, ??, !?, ?!) --------------------
   function formatNAGs(sanText) {
     sanText = sanText.replace(/!!/, '<span class="nag nag-brilliant">!!</span>');
     sanText = sanText.replace(/\?\?/, '<span class="nag nag-blunder">??</span>');
@@ -33,15 +34,15 @@
     return sanText;
   }
 
+  // "Surname, Firstname" → "Firstname Surname"
   function flipName(name) {
     if (!name) return "";
     var idx = name.indexOf(",");
     if (idx === -1) return name.trim();
-    var last = name.substring(0, idx).trim();
-    var first = name.substring(idx + 1).trim();
-    return first + " " + last;
+    return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
   }
 
+  // ---- Parse movetext, extract events (comments, variations, diagrams)
   function parseMovetext(movetext) {
     var events = [];
     var sanitizedParts = [];
@@ -52,6 +53,7 @@
     while (i < n) {
       var ch = movetext.charAt(i);
 
+      // COMMENT { ... }
       if (ch === "{") {
         i++;
         var start = i;
@@ -77,17 +79,20 @@
         continue;
       }
 
+      // VARIATION ( ... )
       if (ch === "(") {
         varDepth++;
         i++;
         var innerStart = i;
         var depth = 1;
+
         while (i < n && depth > 0) {
           var c2 = movetext.charAt(i);
           if (c2 === "(") depth++;
           else if (c2 === ")") depth--;
           i++;
         }
+
         var innerEnd = i - 1;
         var inner = movetext.substring(innerStart, innerEnd).trim();
 
@@ -106,16 +111,18 @@
           });
         }
 
-        if (varDepth > 0) varDepth--;
+        varDepth--;
         continue;
       }
 
+      // Whitespace
       if (/\s/.test(ch)) {
         sanitizedParts.push(" ");
         i++;
         continue;
       }
 
+      // Normal token
       var startTok = i;
       while (i < n) {
         var c3 = movetext.charAt(i);
@@ -125,11 +132,15 @@
       var tok = movetext.substring(startTok, i);
       sanitizedParts.push(tok + " ");
 
-      if (/^\d+\.+$/.test(tok)) continue;
-      if (/^\$\d+$/.test(tok)) continue;
+      // Detect SAN move → count as a ply
+      if (/^\d+\.+$/.test(tok)) continue;        // 4. or 4...
+      if (/^\$\d+$/.test(tok)) continue;         // $1
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
 
-      if (/^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(tok)) {
+      if (
+        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/
+        .test(tok)
+      ) {
         currentPly++;
       }
     }
@@ -138,6 +149,7 @@
     return { sanitized: sanitized, events: events };
   }
 
+  // ---- MAIN RENDER -------------------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
@@ -177,17 +189,14 @@
     var result = normalizeResult(headers.Result || "");
     var moves = game.history({ verbose: true });
 
-    var whiteName = flipName(headers.White || "");
-    var blackName = flipName(headers.Black || "");
-
     var white =
       (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
-      whiteName +
+      flipName(headers.White || "") +
       (headers.WhiteElo ? " (" + headers.WhiteElo + ")" : "");
 
     var black =
       (headers.BlackTitle ? headers.BlackTitle + " " : "") +
-      blackName +
+      flipName(headers.Black || "") +
       (headers.BlackElo ? " (" + headers.BlackElo + ")" : "");
 
     var year = extractYear(headers.Date);
@@ -196,15 +205,16 @@
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    var h3 = document.createElement("h3");
-    h3.innerHTML = white + " – " + black + "<br>" + eventLine;
-    wrapper.appendChild(h3);
+    var header = document.createElement("h3");
+    header.innerHTML = white + " – " + black + "<br>" + eventLine;
+    wrapper.appendChild(header);
 
     var currentPly = 0;
     var eventIdx = 0;
     var currentP = null;
     var lastMoveSpan = null;
 
+    // Events before move 1
     while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
       insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
       eventIdx++;
@@ -213,6 +223,7 @@
     currentP = document.createElement("p");
     wrapper.appendChild(currentP);
 
+    // ---- MAIN MOVES LOOP ----
     for (var mi = 0; mi < moves.length; mi++) {
       var m = moves[mi];
       var moveNumber = Math.floor(mi / 2) + 1;
@@ -229,15 +240,20 @@
 
       currentPly++;
 
+      // Insert events for this ply
       while (eventIdx < events.length &&
              events[eventIdx].plyIndex === currentPly) {
+
         insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
+
         currentP = document.createElement("p");
         wrapper.appendChild(currentP);
+
         eventIdx++;
       }
     }
 
+    // Append result
     if (result && lastMoveSpan) {
       lastMoveSpan.innerHTML =
         lastMoveSpan.innerHTML.trim() + " " + result;
@@ -254,11 +270,13 @@
     }
   }
 
+  // ---- Insert comments, variations, diagrams -------------------
   function insertEventBlock(wrapper, ev, index, plyIndex, game) {
 
-    // ---- DIAGRAM BLOCK ----
+    // ---- DIAGRAM ----
     if (ev.type === "diagram") {
-      // Recreate position from actual game history
+
+      // Build temp position from original game's history
       var temp = new Chess();
       var fullHistory = game.history({ verbose: true });
 
@@ -279,11 +297,19 @@
       div.id = id;
       wrapper.appendChild(div);
 
-    Chessboard(document.getElementById(id), {
-  position: temp.fen(),
-  draggable: false,
-  pieceTheme: PIECE_THEME_URL
-});
+      // Delay creation to ensure the node exists
+      setTimeout(function () {
+        var target = document.getElementById(id);
+        if (!target) {
+          console.error("Diagram DIV not found:", id);
+          return;
+        }
+        Chessboard(target, {
+          position: temp.fen(),
+          draggable: false,
+          pieceTheme: PIECE_THEME_URL
+        });
+      }, 0);
 
       return;
     }
@@ -292,12 +318,7 @@
     var p = document.createElement("p");
     p.className = ev.type === "comment" ? "pgn-comment" : "pgn-variation";
 
-    var depth = ev.depth;
-    if (!depth) {
-      depth = 0;
-      // inheritance (variations carry depth; comments inherit nearest)
-      // simple version: use ev.depth only
-    }
+    var depth = ev.depth || 0;
     if (depth > 0) {
       p.style.marginLeft = (depth * 1.5) + "rem";
     }
@@ -306,6 +327,7 @@
     wrapper.appendChild(p);
   }
 
+  // ---- Initialization ----------
   function renderAll(root) {
     var nodes = (root || document).querySelectorAll("pgn");
     for (var i = 0; i < nodes.length; i++) {
