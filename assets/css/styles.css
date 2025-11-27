@@ -1,26 +1,32 @@
-.diagram {margin-top: 2rem; margin-bottom: 2rem;}
+.diagram {margin-y: 2rem;}
 
 img[src*="fen.gif"] {
   width: 400px !important;
   height: auto;
 }
 
-#myBoard *,
-#myBoard *::before,
-#myBoard *::after,
-#board *,
-#board *::before,
-#board *::after,
-.board *,
-.board *::before,
-.board *::after {
-  box-sizing: content-box !important; 
+.fen-board {
+  width: 400px;
+  max-width: 100%;
+  margin: 1rem auto;
 }
 
 #board,
 .board {width: 400px;}
 .board-wrapper {max-width: 400px !important;}
-.board-wrapper * {box-sizing: content-box !important;}
+
+
+#board *,
+#board *::before,
+#board *::after,
+.board *,
+.board *::before,
+.board *::after,
+.board-wrapper * {
+  box-sizing: content-box !important; 
+}
+
+
 
 /* assets/css/chess.css 
 
