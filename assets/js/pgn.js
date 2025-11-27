@@ -1,5 +1,5 @@
 // assets/js/chess/pgn.js
-// Parse <pgn>...</pgn> blocks into structured posts with diagrams.
+// Convert <pgn>...</pgn> into formatted posts with ONE diagram (middle of game)
 
 (function () {
   "use strict";
@@ -19,10 +19,24 @@
     return true;
   }
 
-  function extractYear(dateStr) {
-    return dateStr?.split(".")[0] || "";
+  const pendingBoards = [];
+
+  function queueBoard(id, fenOrStart) {
+    pendingBoards.push({ id, fen: fenOrStart });
   }
 
+<<<<<<< HEAD
+  function initAllBoards() {
+    pendingBoards.forEach(({ id, fen }) => {
+      const el = document.getElementById(id);
+      if (el) {
+        Chessboard(id, {
+          position: fen === "start" ? "start" : fen,
+          draggable: false,
+          pieceTheme: PIECE_THEME_URL
+        });
+      }
+=======
   // ---------------------------------------
   // DEFERRED BOARD INITIALIZATION QUEUE
   // ---------------------------------------
@@ -44,12 +58,20 @@
       } else {
         console.warn("Board container not found:", id);
       }
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
     });
     pendingBoards.length = 0;
   }
 
+<<<<<<< HEAD
+  function extractYear(dateStr) {
+    return dateStr?.split(".")[0] || "";
+  }
+
+=======
   // ---------------------------------------
 
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
   function renderPGNElement(el, index) {
     if (!ensure()) return;
 
@@ -71,13 +93,19 @@
     const event = headers.Event || "";
     const year = extractYear(headers.Date);
 
+    // Get moves (verbose)
     const moves = game.history({ verbose: true });
     game.reset();
 
+    // Create wrapper
     const wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
+<<<<<<< HEAD
+    // H2 + H3
+=======
     // H2
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
     const h2 = document.createElement("h2");
     h2.textContent = `${white} – ${black}`;
     wrapper.appendChild(h2);
@@ -87,28 +115,70 @@
     h3.textContent = year ? `${event}, ${year}` : event;
     wrapper.appendChild(h3);
 
+<<<<<<< HEAD
+    // --------------------------------------------
+    // ONE DIAGRAM FOR THE MIDDLE OF THE GAME
+    // --------------------------------------------
+=======
     // START DIAGRAM
     const startId = `pgn-start-${index}`;
     const startDiv = document.createElement("div");
     startDiv.id = startId;
     startDiv.className = "pgn-board";
     wrapper.appendChild(startDiv);
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
 
+<<<<<<< HEAD
+    // Start from the beginning, walk moves until halfway
+    const halfIndex = Math.floor(moves.length / 2);
+    game.reset();
+    for (let i = 0; i < halfIndex; i++) {
+      game.move(moves[i].san);
+    }
+=======
     // Queue board creation AFTER DOM insertion
     queueBoard(startId, "start");
 
     // Paragraphs & diagrams every 5 full moves
     let p = document.createElement("p");
     let fullMoveCount = 0;
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
+
+    const middleFen = game.fen();
+
+    // Insert middle-game diagram
+    const midId = `pgn-middle-${index}`;
+    const midDiv = document.createElement("div");
+    midDiv.id = midId;
+    midDiv.className = "pgn-board";
+    wrapper.appendChild(midDiv);
+
+    queueBoard(midId, middleFen);
+
+    // --------------------------------------------
+    // Moves (continous paragraph, no break)
+    // --------------------------------------------
+    game.reset();
+    const p = document.createElement("p");
 
     for (let i = 0; i < moves.length; i++) {
       const m = moves[i];
       const isWhite = m.color === "w";
+<<<<<<< HEAD
+      const moveNo = Math.floor(i / 2) + 1;
+=======
       const moveNumber = Math.floor(i / 2) + 1;
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
 
       const span = document.createElement("span");
+<<<<<<< HEAD
+      span.textContent = isWhite ? `${moveNo}. ${m.san} ` : `${m.san} `;
+=======
       span.textContent = isWhite ? `${moveNumber}. ${m.san} ` : `${m.san} `;
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
       p.appendChild(span);
+<<<<<<< HEAD
+=======
 
       game.move(m.san);
 
@@ -129,14 +199,25 @@
           p = document.createElement("p");
         }
       }
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
     }
 
-    if (p.textContent.trim()) wrapper.appendChild(p);
+    wrapper.appendChild(p);
 
+<<<<<<< HEAD
+    // Replace <pgn> block
+=======
     // Replace <pgn> with wrapper
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
     el.replaceWith(wrapper);
 
+<<<<<<< HEAD
+    initAllBoards();
+
+    // Figurine conversion AFTER PGN rendering
+=======
     // Convert SAN → figurine after building structure
+>>>>>>> 5b3b6a080a5918d491fe65a4e07ee4cbdcf555c6
     if (window.ChessFigurine) ChessFigurine.run(wrapper);
   }
 

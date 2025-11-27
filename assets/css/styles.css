@@ -11,6 +11,7 @@ img[src*="fen.gif"] {
 }
 
 #board,
+.pgn-board 
 .board {width: 400px;}
 .board-wrapper {max-width: 400px !important;}
 
@@ -24,6 +25,9 @@ img[src*="fen.gif"] {
 .fen-board *,
 .fen-board *::before,
 .fen-board *::after,
+.pgn-board *,
+.pgn-board *::before,
+.pgn-board *::after,
 .board-wrapper * {
   box-sizing: content-box !important; 
 }
