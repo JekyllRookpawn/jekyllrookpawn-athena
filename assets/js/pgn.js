@@ -90,10 +90,8 @@
       ctx.lastWasInterrupt = false;
     } else {
       var printBlack = false;
-
-      if (ctx.type === "main" && ply === 1) {
-        printBlack = true;
-      } else if (ctx.lastWasInterrupt) {
+      
+      if (ctx.lastWasInterrupt) {
         printBlack = true;
       }
 
@@ -254,19 +252,17 @@
         continue;
       }
 
-      // keep results (½-½, etc.)
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(token)) {
         ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
         appendText(ctx.container, token + " ");
         continue;
       }
 
-      // IGNORE PGN move-number tokens like "1.", "23.", etc.
+      // IGNORE literal PGN move numbers like "1.", "23."
       if (/^\d+\.+$/.test(token)) {
         continue;
       }
 
-      // SAN move?
       ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
       var sanSpan = handleSANToken(token, ctx);
       if (!sanSpan) {
