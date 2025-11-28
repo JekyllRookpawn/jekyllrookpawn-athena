@@ -77,28 +77,28 @@
     }
   }
 
+  // Create a clickable move span, add numbering according to rules, and advance Chess.
   function handleSANToken(displayToken, ctx) {
     var core = displayToken.replace(/[!?+#]+$/g, "");
     if (!isSANCore(core)) return null;
 
-    var ply = ctx.chess.history().length;
+    var ply = ctx.chess.history().length; // half-move count so far
     var isWhite = (ply % 2 === 0);
     var moveNumber = Math.floor(ply / 2) + 1;
 
     if (isWhite) {
+      // White move: always print "N."
       appendText(ctx.container, moveNumber + ". ");
       ctx.lastWasInterrupt = false;
     } else {
+      // Black: only print "N..." if there was an interruption
       var printBlack = false;
-      
       if (ctx.lastWasInterrupt) {
         printBlack = true;
       }
-
       if (printBlack) {
         appendText(ctx.container, moveNumber + "... ");
       }
-
       ctx.lastWasInterrupt = false;
     }
 
@@ -117,38 +117,79 @@
     return span;
   }
 
+  // Parse a comment {...}, decide if it's inline (no SAN) or block (with SAN)
   function parseComment(movetext, pos, outerCtx, wrapper) {
+    var n = movetext.length;
+    var start = pos;
+
+    // Read full comment content up to closing brace
+    while (pos < n && movetext[pos] !== "}") pos++;
+    var content = movetext.substring(start, pos);
+    if (pos < n && movetext[pos] === "}") pos++; // skip closing }
+
+    var tokens = content.split(/\s+/).filter(Boolean);
+    var hasSAN = false;
+    for (var i = 0; i < tokens.length; i++) {
+      var core = tokens[i].replace(/[!?+#]+$/g, "");
+      if (isSANCore(core)) {
+        hasSAN = true;
+        break;
+      }
+    }
+
+    // ========= INLINE COMMENT (no SAN inside) =========
+    if (!hasSAN) {
+      // Ensure same paragraph as current context
+      ensureParagraph(
+        outerCtx,
+        wrapper,
+        outerCtx.type === "main" ? "pgn-mainline" : "pgn-variation"
+      );
+
+      // Split by [D] markers so we can drop diagrams at correct spots
+      var parts = content.split("[D]");
+      for (var pIndex = 0; pIndex < parts.length; pIndex++) {
+        var textPart = parts[pIndex].trim();
+        if (textPart) {
+          // prepend space so it reads "... Na3 de düşünülebilemezdi."
+          appendText(outerCtx.container, " " + textPart);
+        }
+        // If not the last part, there was a [D] here
+        if (pIndex < parts.length - 1) {
+          createDiagram(wrapper, outerCtx.chess.fen());
+        }
+      }
+      // Inline comment does NOT count as interruption for numbering
+      return pos;
+    }
+
+    // ========= BLOCK COMMENT (with SAN) =========
+    // Use separate Chess for FEN, but do NOT print any move numbers here
     var commentChess = new Chess(outerCtx.chess.fen());
     var p = document.createElement("p");
     p.className = "pgn-comment";
     wrapper.appendChild(p);
 
-    var n = movetext.length;
-    while (pos < n) {
-      var ch = movetext[pos];
-
-      if (ch === "}") {
-        pos++;
-        break;
-      }
+    // Tokenize content again but with simple rules
+    var idx = 0;
+    var len = content.length;
+    while (idx < len) {
+      var ch = content[idx];
 
       if (/\s/.test(ch)) {
-        while (pos < n && /\s/.test(movetext[pos])) pos++;
+        while (idx < len && /\s/.test(content[idx])) idx++;
         appendText(p, " ");
         continue;
       }
 
-      var start = pos;
-      while (pos < n) {
-        var c2 = movetext[pos];
-        if (/\s/.test(c2) || c2 === "}") break;
-        pos++;
-      }
-      var token = movetext.substring(start, pos);
+      var startTok = idx;
+      while (idx < len && !/\s/.test(content[idx])) idx++;
+      var token = content.substring(startTok, idx);
       if (!token) continue;
 
       if (token === "[D]") {
         createDiagram(wrapper, commentChess.fen());
+        // After diagram in a block comment, start a new comment paragraph
         p = document.createElement("p");
         p.className = "pgn-comment";
         wrapper.appendChild(p);
@@ -174,7 +215,11 @@
       })();
     }
 
+    // Block comments DO count as interruption
     outerCtx.lastWasInterrupt = true;
+    // next text in outer context should go to a fresh paragraph
+    outerCtx.container = null;
+
     return pos;
   }
 
@@ -196,13 +241,19 @@
     while (i < n) {
       var ch = movetext[i];
 
+      // Whitespace
       if (/\s/.test(ch)) {
         while (i < n && /\s/.test(movetext[i])) i++;
-        ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
+        ensureParagraph(
+          ctx,
+          wrapper,
+          ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+        );
         appendText(ctx.container, " ");
         continue;
       }
 
+      // Start variation
       if (ch === "(") {
         i++;
         ctx.lastWasInterrupt = true;
@@ -220,22 +271,24 @@
         continue;
       }
 
+      // End variation
       if (ch === ")") {
         i++;
         if (ctx.parent) {
           ctx = ctx.parent;
-          ctx.lastWasInterrupt = true;
-          ctx.container = null;
+          ctx.lastWasInterrupt = true; // returning from var = interruption
+          ctx.container = null; // next text in parent starts fresh paragraph
         }
         continue;
       }
 
+      // Comment
       if (ch === "{") {
         i = parseComment(movetext, i + 1, ctx, wrapper);
-        ctx.container = null;
         continue;
       }
 
+      // Normal token
       var start = i;
       while (i < n) {
         var c2 = movetext[i];
@@ -245,6 +298,7 @@
       var token = movetext.substring(start, i);
       if (!token) continue;
 
+      // Diagram marker
       if (token === "[D]") {
         createDiagram(wrapper, ctx.chess.fen());
         ctx.lastWasInterrupt = true;
@@ -252,8 +306,13 @@
         continue;
       }
 
+      // Game result (1-0, ½-½, etc.)
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(token)) {
-        ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
+        ensureParagraph(
+          ctx,
+          wrapper,
+          ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+        );
         appendText(ctx.container, token + " ");
         continue;
       }
@@ -263,7 +322,12 @@
         continue;
       }
 
-      ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
+      // SAN move
+      ensureParagraph(
+        ctx,
+        wrapper,
+        ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+      );
       var sanSpan = handleSANToken(token, ctx);
       if (!sanSpan) {
         appendText(ctx.container, token + " ");
