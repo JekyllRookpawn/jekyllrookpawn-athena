@@ -1,1 +1,436 @@
-(function(){"use strict";const P="https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png",S=/^([O0]-[O0](-[O0])?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/,R=/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/,M=/^(\d+)(\.+)$/;let g=0;function h(){if(typeof Chess=="undefined"){console.warn("pgn.js: chess.js missing");return!1}return!0}function A(e){return e?e.replace(/1\/2-1\/2/g,"½-½"):""}function E(e){if(!e)return"";const t=e.split(".");return/^\d{4}$/.test(t[0])?t[0]:""}function T(e){if(!e)return"";const t=e.indexOf(",");return t===-1?e.trim():e.substring(t+1).trim()+" "+e.substring(0,t).trim()}function a(e,t){t&&e.appendChild(document.createTextNode(t))}function D(e,t){if(typeof Chessboard=="undefined"){console.warn("pgn.js: chessboard.js missing for diagrams");return}const n="pgn-diagram-"+g++,r=document.createElement("div");r.className="pgn-diagram";r.id=n;r.style.width="340px";r.style.maxWidth="100%";e.appendChild(r);setTimeout(function(){const i=document.getElementById(n);if(!i)return;Chessboard(i,{position:t,draggable:!1,pieceTheme:P})},0)}class v{constructor(t){this.sourceEl=t;this.wrapper=document.createElement("div");this.wrapper.className="pgn-blog-block";this.buildFromElement();this.fig()}static isSANCore(e){return S.test(e)}static split(e){const t=e.split(/\r?\n/);const n=[],r=[];let i=!0;for(const o of t){const s=o.trim();if(i&&s.startsWith("[")&&s.endsWith("]"))n.push(o);else if(i&&s==="")i=!1;else{i=!1;r.push(o)}}const c=r.join(" ").replace(/\s+/g," ").trim();return{headerLines:n,movetext:c}}buildFromElement(){const e=this.sourceEl.textContent.trim(),{headerLines:t,movetext:n}=v.split(e),r=(t.length?t.join("\n")+"\n\n":"")+n,i=new Chess;i.load_pgn(r,{sloppy:!0});const o=i.header(),s=A(o.Result||"");this.header(o);this.dom(n+(s?" "+s:""));this.sourceEl.replaceWith(this.wrapper)}header(e){const t=(e.WhiteTitle?e.WhiteTitle+" ":"")+T(e.White||"")+(e.WhiteElo?" ("+e.WhiteElo+")":""),n=(e.BlackTitle?e.BlackTitle+" ":"")+T(e.Black||"")+(e.BlackElo?" ("+e.BlackElo+")":""),r=E(e.Date),i=(e.Event||"")+(r?", "+r:""),o=document.createElement("h3"),s=t+" \u2013 "+n;o.appendChild(document.createTextNode(s));o.appendChild(document.createElement("br"));o.appendChild(document.createTextNode(i));this.wrapper.appendChild(o)}ensureP(e,t){if(!t.container){const n=document.createElement("p");n.className=e;this.wrapper.appendChild(n);t.container=n}}handleSAN(e,t){let n=e.replace(/[^a-hKQRBN0-9=O0-]+$/g,"");n=n.replace(/0/g,"O");if(!v.isSANCore(n))return null;const r=t.chess.move(n,{sloppy:!0});if(!r){a(t.container,e+" ");return null}const i=document.createElement("span");i.className="pgn-move sticky-move";i.dataset.fen=t.chess.fen();i.textContent=e+" ";t.container.appendChild(i);return i}parseComment(e,t,n){const r=e.length;let i=t;while(i<r&&e[i]!=="}")i++;const o=e.substring(t,i);if(i<r&&e[i]==="}")i++;const s=o.split(/\s+/).filter(Boolean);let c=!1;for(let l=0;l<s.length;l++){let f=s[l].replace(/[^a-hKQRBN0-9=O0-]+$/g,"");f=f.replace(/0/g,"O");if(v.isSANCore(f)){c=!0;break}}if(!c){this.ensureP(n.type==="main"?"pgn-mainline":"pgn-variation",n);const l=o.split("[D]");for(let f=0;f<l.length;f++){const u=l[f].trim();u&&a(n.container," "+u);f<l.length-1&&D(this.wrapper,n.chess.fen())}return i}const d=new Chess(n.chess.fen());let p=document.createElement("p");p.className="pgn-comment";this.wrapper.appendChild(p);let u=0,m=o.length;while(u<m){const l=o[u];if(/\s/.test(l)){while(u<m&&/\s/.test(o[u]))u++;a(p," ");continue}let f=u;while(u<m&&!/\s/.test(o[u]))u++;const w=o.substring(f,u);if(!w)continue;if(w==="[D]"){D(this.wrapper,d.fen());p=document.createElement("p");p.className="pgn-comment";this.wrapper.appendChild(p);continue}let k=w.replace(/[^a-hKQRBN0-9=O0-]+$/g,"");k=k.replace(/0/g,"O");if(!v.isSANCore(k)){a(p,w+" ");continue}const C=d.move(k,{sloppy:!0});if(!C){a(p,w+" ");continue}const x=document.createElement("span");x.className="pgn-move sticky-move";x.dataset.fen=d.fen();x.textContent=w+" ";p.appendChild(x)}n.container=null;return i}dom(e){const t=new Chess;let n={type:"main",chess:t,container:null,parent:null},r=n,i=0,o=e.length;while(i<o){const s=e[i];if(/\s/.test(s)){while(i<o&&/\s/.test(e[i]))i++;this.ensureP(r.type==="main"?"pgn-mainline":"pgn-variation",r);a(r.container," ");continue}if(s==="("){i++;const d=new Chess(r.chess.fen());r={type:"variation",chess:d,container:null,parent:r};this.ensureP("pgn-variation",r);continue}if(s===")"){i++;if(r.parent){r=r.parent;r.container=null}continue}if(s==="{"){i=this.parseComment(e,i+1,r);continue}let c=i;while(i<o){const d=e[i];if(/\s/.test(d)||d==="("||d===")"||d==="{"||d==="}")break;i++}const d=e.substring(c,i);if(!d)continue;if(d==="[D]"){this.ensureP(r.type==="main"?"pgn-mainline":"pgn-variation",r);D(this.wrapper,r.chess.fen());r.container=null;continue}if(R.test(d)){this.ensureP(r.type==="main"?"pgn-mainline":"pgn-variation",r);a(r.container,d+" ");continue}if(M.test(d)){this.ensureP(r.type==="main"?"pgn-mainline":"pgn-variation",r);a(r.container,d+" ");continue}this.ensureP(r.type==="main"?"pgn-mainline":"pgn-variation",r);const p=this.handleSAN(d,r);if(!p)a(r.container,d+" ")}}fig(){if(window.ChessFigurine&&typeof window.ChessFigurine.run==="function"){window.ChessFigurine.run(this.wrapper);return}const e={K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘"};this.wrapper.querySelectorAll(".pgn-move").forEach(t=>{const n=t.textContent,r=n.match(/^([KQRBN])(.+?)(\s*)$/);if(!r)return;const i=e[r[1]];if(!i)return;t.textContent=i+r[2]+(r[3]||"")})}}class F{static renderAll(e){const t=e||document;t.querySelectorAll("pgn").forEach(n=>new v(n))}static init(){if(!h())return;F.renderAll(document);window.PGNRenderer={run:function(e){F.renderAll(e||document.body)}}}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){F.init()})}else{F.init()}})();
+// assets/js/chess/pgn.js
+(function () {
+  "use strict";
+
+  const PIECE_THEME_URL =
+    "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
+
+  // Allow both O-O and 0-0 / 0-0-0 as castling
+  const SAN_CORE_REGEX =
+    /^([O0]-[O0](-[O0])?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/;
+
+  const RESULT_REGEX = /^(1-0|0-1|1\/2-1\/2|½-½|\*)$/;
+  const MOVE_NUMBER_REGEX = /^(\d+)(\.+)$/; // e.g. 4. or 4...
+
+  let diagramCounter = 0;
+
+  // --- helpers ---
+
+  function ensureDeps() {
+    if (typeof Chess === "undefined") {
+      console.warn("pgn.js: chess.js missing");
+      return false;
+    }
+    return true;
+  }
+
+  function normalizeResult(str) {
+    return str ? str.replace(/1\/2-1\/2/g, "½-½") : "";
+  }
+
+  function extractYear(dateStr) {
+    if (!dateStr) return "";
+    const p = dateStr.split(".");
+    return /^\d{4}$/.test(p[0]) ? p[0] : "";
+  }
+
+  function flipName(name) {
+    if (!name) return "";
+    const idx = name.indexOf(",");
+    if (idx === -1) return name.trim();
+    return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
+  }
+
+  function appendText(container, text) {
+    if (!text) return;
+    container.appendChild(document.createTextNode(text));
+  }
+
+  function createDiagram(wrapper, fen) {
+    if (typeof Chessboard === "undefined") {
+      console.warn("pgn.js: chessboard.js missing for diagrams");
+      return;
+    }
+
+    const id = "pgn-diagram-" + diagramCounter++;
+    const div = document.createElement("div");
+    div.className = "pgn-diagram";
+    div.id = id;
+    div.style.width = "340px";
+    div.style.maxWidth = "100%";
+    wrapper.appendChild(div);
+
+    setTimeout(function () {
+      const target = document.getElementById(id);
+      if (!target) return;
+      Chessboard(target, {
+        position: fen,
+        draggable: false,
+        pieceTheme: PIECE_THEME_URL
+      });
+    }, 0);
+  }
+
+  // ---------- PGNGameView ----------
+
+  class PGNGameView {
+    constructor(el) {
+      this.sourceEl = el;
+      this.wrapper = document.createElement("div");
+      this.wrapper.className = "pgn-blog-block";
+
+      this.buildFromElement();
+      this.applyFigurines();
+    }
+
+    // --- static helpers ---
+
+    static isSANCore(tok) {
+      return SAN_CORE_REGEX.test(tok);
+    }
+
+    static splitHeadersAndMovetext(raw) {
+      const lines = raw.split(/\r?\n/);
+
+      const headerLines = [];
+      const movetextLines = [];
+      let inHeader = true;
+
+      lines.forEach((line) => {
+        const t = line.trim();
+        if (inHeader && t.startsWith("[") && t.endsWith("]")) {
+          headerLines.push(line);
+        } else if (inHeader && t === "") {
+          inHeader = false;
+        } else {
+          inHeader = false;
+          movetextLines.push(line);
+        }
+      });
+
+      const movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
+      return { headerLines, movetext };
+    }
+
+    // --- main entry per <pgn> ---
+
+    buildFromElement() {
+      const raw = this.sourceEl.textContent.trim();
+      const { headerLines, movetext } = PGNGameView.splitHeadersAndMovetext(raw);
+
+      const cleanedPGN =
+        (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + movetext;
+
+      const game = new Chess();
+      game.load_pgn(cleanedPGN, { sloppy: true });
+      const headers = game.header();
+      const result = normalizeResult(headers.Result || "");
+
+      this.createHeader(headers);
+      this.buildMovetextDOM(movetext + (result ? " " + result : ""));
+
+      this.sourceEl.replaceWith(this.wrapper);
+    }
+
+    createHeader(headers) {
+      const white =
+        (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
+        flipName(headers.White || "") +
+        (headers.WhiteElo ? " (" + headers.WhiteElo + ")" : "");
+
+      const black =
+        (headers.BlackTitle ? headers.BlackTitle + " " : "") +
+        flipName(headers.Black || "") +
+        (headers.BlackElo ? " (" + headers.BlackElo + ")" : "");
+
+      const year = extractYear(headers.Date);
+      const eventLine = (headers.Event || "") + (year ? ", " + year : "");
+
+      const h3 = document.createElement("h3");
+      const titleLine = `${white} \u2013 ${black}`; // en dash
+
+      h3.appendChild(document.createTextNode(titleLine));
+      h3.appendChild(document.createElement("br"));
+      h3.appendChild(document.createTextNode(eventLine));
+      this.wrapper.appendChild(h3);
+    }
+
+    ensureParagraph(ctx, className) {
+      if (!ctx.container) {
+        const p = document.createElement("p");
+        p.className = className;
+        this.wrapper.appendChild(p);
+        ctx.container = p;
+      }
+    }
+
+    // --- move handling ---
+
+    handleSAN(displayToken, ctx) {
+      // Strip trailing non-SAN characters (e.g. "+-", "?!", "!!")
+      let core = displayToken.replace(/[^a-hKQRBN0-9=O0-]+$/g, "");
+      // Normalize 0-0 -> O-O to make chess.js happy
+      core = core.replace(/0/g, "O");
+      if (!PGNGameView.isSANCore(core)) {
+        appendText(ctx.container, displayToken + " ");
+        return null;
+      }
+
+      // Compute global ply BEFORE this move
+      const baseLen =
+        typeof ctx.baseHistoryLen === "number" ? ctx.baseHistoryLen : 0;
+      const localHist = ctx.chess.history().length;
+      const plyBefore = baseLen + localHist;
+      const isWhiteToMove = plyBefore % 2 === 0;
+      const moveNumber = Math.floor(plyBefore / 2) + 1;
+
+      // MAINLINE: always number white, number black only after interruption
+      if (ctx.type === "main") {
+        if (isWhiteToMove) {
+          appendText(ctx.container, moveNumber + ". ");
+        } else if (ctx.lastWasInterrupt) {
+          appendText(ctx.container, moveNumber + "... ");
+        }
+      } else {
+        // VARIATION: always number white, number black only if interruption
+        if (isWhiteToMove) {
+          appendText(ctx.container, moveNumber + ". ");
+        } else if (ctx.lastWasInterrupt) {
+          appendText(ctx.container, moveNumber + "... ");
+        }
+      }
+
+      // Store branch info for future variations
+      ctx.prevFen = ctx.chess.fen();
+      ctx.prevHistoryLen = baseLen + localHist;
+
+      const mv = ctx.chess.move(core, { sloppy: true });
+      if (!mv) {
+        appendText(ctx.container, displayToken + " ");
+        return null;
+      }
+
+      ctx.lastWasInterrupt = false;
+
+      const span = document.createElement("span");
+      span.className = "pgn-move sticky-move";
+      span.dataset.fen = ctx.chess.fen();
+      span.textContent = displayToken + " ";
+      ctx.container.appendChild(span);
+
+      return span;
+    }
+
+    // --- comment parsing: pure text + diagrams, no SAN moves ---
+
+    parseComment(movetext, pos, ctx) {
+      const n = movetext.length;
+      let idx = pos;
+
+      while (idx < n && movetext[idx] !== "}") idx++;
+      const content = movetext.substring(pos, idx);
+      if (idx < n && movetext[idx] === "}") idx++;
+
+      this.ensureParagraph(
+        ctx,
+        ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+      );
+
+      const parts = content.split("[D]");
+      for (let pIndex = 0; pIndex < parts.length; pIndex++) {
+        const textPart = parts[pIndex];
+        if (textPart && textPart.trim()) {
+          appendText(ctx.container, " " + textPart.trim());
+        }
+        if (pIndex < parts.length - 1) {
+          // Diagram inside comment uses current outer position
+          createDiagram(this.wrapper, ctx.chess.fen());
+        }
+      }
+
+      // Comment counts as interruption for numbering
+      ctx.lastWasInterrupt = true;
+
+      return idx;
+    }
+
+    // --- movetext walker ---
+
+    buildMovetextDOM(movetext) {
+      const mainChess = new Chess();
+
+      const rootCtx = {
+        type: "main",
+        chess: mainChess,
+        container: null,
+        parent: null,
+        lastWasInterrupt: false,
+        prevFen: mainChess.fen(),
+        prevHistoryLen: 0,
+        baseHistoryLen: null
+      };
+      let ctx = rootCtx;
+
+      let i = 0;
+      const n = movetext.length;
+
+      while (i < n) {
+        const ch = movetext[i];
+
+        // Whitespace
+        if (/\s/.test(ch)) {
+          while (i < n && /\s/.test(movetext[i])) i++;
+          this.ensureParagraph(
+            ctx,
+            ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+          );
+          appendText(ctx.container, " ");
+          continue;
+        }
+
+        // Start variation
+        if (ch === "(") {
+          i++;
+
+          // Branch from position BEFORE last mainline move (if we have one)
+          const branchFen = ctx.prevFen || ctx.chess.fen();
+          const branchHist =
+            typeof ctx.prevHistoryLen === "number"
+              ? ctx.prevHistoryLen
+              : ctx.chess.history().length;
+
+          const varChess = new Chess(branchFen);
+          const varCtx = {
+            type: "variation",
+            chess: varChess,
+            container: null,
+            parent: ctx,
+            lastWasInterrupt: true, // so first black move shows "4..."
+            prevFen: branchFen,
+            prevHistoryLen: branchHist,
+            baseHistoryLen: branchHist
+          };
+          ctx = varCtx;
+          this.ensureParagraph(ctx, "pgn-variation");
+          continue;
+        }
+
+        // End variation
+        if (ch === ")") {
+          i++;
+          if (ctx.parent) {
+            ctx = ctx.parent;
+            ctx.lastWasInterrupt = true; // returning from var = interruption
+            ctx.container = null; // next text in parent starts fresh paragraph
+          }
+          continue;
+        }
+
+        // Comment
+        if (ch === "{") {
+          i = this.parseComment(movetext, i + 1, ctx);
+          continue;
+        }
+
+        // Normal token
+        const start = i;
+        while (i < n) {
+          const c2 = movetext[i];
+          if (/\s/.test(c2) || c2 === "(" || c2 === ")" || c2 === "{" || c2 === "}") {
+            break;
+          }
+          i++;
+        }
+        const token = movetext.substring(start, i);
+        if (!token) continue;
+
+        // Diagram marker
+        if (token === "[D]") {
+          createDiagram(this.wrapper, ctx.chess.fen());
+          ctx.lastWasInterrupt = true;
+          ctx.container = null;
+          continue;
+        }
+
+        // Game result
+        if (RESULT_REGEX.test(token)) {
+          this.ensureParagraph(
+            ctx,
+            ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+          );
+          appendText(ctx.container, token + " ");
+          continue;
+        }
+
+        // Literal move numbers like "4." or "4..."
+        // We IGNORE them and generate numbering ourselves.
+        if (MOVE_NUMBER_REGEX.test(token)) {
+          continue;
+        }
+
+        // SAN move (or plain token)
+        this.ensureParagraph(
+          ctx,
+          ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+        );
+        const sanSpan = this.handleSAN(token, ctx);
+        if (!sanSpan) {
+          appendText(ctx.container, token + " ");
+        }
+      }
+    }
+
+    // --- figurines only on move spans ---
+
+    applyFigurines() {
+      const map = {
+        K: "♔",
+        Q: "♕",
+        R: "♖",
+        B: "♗",
+        N: "♘"
+      };
+
+      const moveSpans = this.wrapper.querySelectorAll(".pgn-move");
+      moveSpans.forEach((span) => {
+        const text = span.textContent;
+        const match = text.match(/^([KQRBN])(.+?)(\s*)$/);
+        if (!match) return;
+        const [, letter, rest, ws] = match;
+        const fig = map[letter];
+        if (!fig) return;
+        span.textContent = fig + rest + (ws || "");
+      });
+    }
+  }
+
+  // ---------- PGNRenderer ----------
+
+  class PGNRenderer {
+    static renderAll(root) {
+      const scope = root || document;
+      const elements = scope.querySelectorAll("pgn");
+      elements.forEach((el) => new PGNGameView(el));
+    }
+
+    static init() {
+      if (!ensureDeps()) return;
+
+      PGNRenderer.renderAll(document);
+
+      window.PGNRenderer = {
+        run(root) {
+          PGNRenderer.renderAll(root || document.body);
+        }
+      };
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      PGNRenderer.init();
+    });
+  } else {
+    PGNRenderer.init();
+  }
+})();
