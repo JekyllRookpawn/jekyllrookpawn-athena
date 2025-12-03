@@ -2,8 +2,14 @@
 (function () {
   "use strict";
 
-  var PIECE_THEME_URL =
+  const PIECE_THEME_URL =
     "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
+
+  const SAN_CORE_REGEX = /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/;
+  const RESULT_REGEX = /^(1-0|0-1|1\/2-1\/2|½-½|\*)$/;
+  const MOVE_NUMBER_REGEX = /^\d+\.+$/;
+
+  let diagramCounter = 0;
 
   function ensureDeps() {
     if (typeof Chess === "undefined") {
@@ -19,13 +25,13 @@
 
   function extractYear(dateStr) {
     if (!dateStr) return "";
-    var p = dateStr.split(".");
+    const p = dateStr.split(".");
     return /^\d{4}$/.test(p[0]) ? p[0] : "";
   }
 
   function flipName(name) {
     if (!name) return "";
-    var idx = name.indexOf(",");
+    const idx = name.indexOf(",");
     if (idx === -1) return name.trim();
     return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
   }
@@ -35,16 +41,14 @@
     container.appendChild(document.createTextNode(text));
   }
 
-  var diagramCounter = 0;
-
   function createDiagram(wrapper, fen) {
     if (typeof Chessboard === "undefined") {
       console.warn("pgn.js: chessboard.js missing for diagrams");
       return;
     }
 
-    var id = "pgn-diagram-" + (diagramCounter++);
-    var div = document.createElement("div");
+    const id = "pgn-diagram-" + diagramCounter++;
+    const div = document.createElement("div");
     div.className = "pgn-diagram";
     div.id = id;
     div.style.width = "340px";
@@ -52,7 +56,7 @@
     wrapper.appendChild(div);
 
     setTimeout(function () {
-      var target = document.getElementById(id);
+      const target = document.getElementById(id);
       if (!target) return;
       Chessboard(target, {
         position: fen,
@@ -62,358 +66,458 @@
     }, 0);
   }
 
-  function isSANCore(tok) {
-    return /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(
-      tok
-    );
-  }
+  class PGNGameView {
+    constructor(el) {
+      this.sourceEl = el;
+      this.wrapper = document.createElement("div");
+      this.wrapper.className = "pgn-blog-block";
 
-  function ensureParagraph(ctx, wrapper, className) {
-    if (!ctx.container) {
-      var p = document.createElement("p");
-      p.className = className;
-      wrapper.appendChild(p);
-      ctx.container = p;
-    }
-  }
+      this.board = null;
+      this.activeMoveSpan = null;
 
-  // Create a clickable move span, add numbering according to rules, and advance Chess.
-  function handleSANToken(displayToken, ctx) {
-    var core = displayToken.replace(/[!?+#]+$/g, "");
-    if (!isSANCore(core)) return null;
-
-    var ply = ctx.chess.history().length; // half-move count so far
-    var isWhite = (ply % 2 === 0);
-    var moveNumber = Math.floor(ply / 2) + 1;
-
-    if (isWhite) {
-      // White move: always print "N."
-      appendText(ctx.container, moveNumber + ". ");
-      ctx.lastWasInterrupt = false;
-    } else {
-      // Black: only print "N..." if there was an interruption
-      var printBlack = false;
-      if (ctx.lastWasInterrupt) {
-        printBlack = true;
-      }
-      if (printBlack) {
-        appendText(ctx.container, moveNumber + "... ");
-      }
-      ctx.lastWasInterrupt = false;
+      this.buildFromElement();
+      this.attachMoveClickHandler();
+      this.applyFigurines();
     }
 
-    var mv = ctx.chess.move(core, { sloppy: true });
-    if (!mv) {
-      appendText(ctx.container, displayToken + " ");
-      return null;
+    static isSANCore(tok) {
+      return SAN_CORE_REGEX.test(tok);
     }
 
-    var span = document.createElement("span");
-    span.className = "pgn-move sticky-move";
-    span.dataset.fen = ctx.chess.fen();
-    span.textContent = displayToken + " ";
-    ctx.container.appendChild(span);
+    static splitHeadersAndMovetext(raw) {
+      const lines = raw.split(/\r?\n/);
 
-    return span;
-  }
+      const headerLines = [];
+      const movetextLines = [];
+      let inHeader = true;
 
-  // Parse a comment {...}, decide if it's inline (no SAN) or block (with SAN)
-  function parseComment(movetext, pos, outerCtx, wrapper) {
-    var n = movetext.length;
-    var start = pos;
+      lines.forEach((line) => {
+        const t = line.trim();
+        if (inHeader && t.startsWith("[") && t.endsWith("]")) {
+          headerLines.push(line);
+        } else if (inHeader && t === "") {
+          inHeader = false;
+        } else {
+          inHeader = false;
+          movetextLines.push(line);
+        }
+      });
 
-    // Read full comment content up to closing brace
-    while (pos < n && movetext[pos] !== "}") pos++;
-    var content = movetext.substring(start, pos);
-    if (pos < n && movetext[pos] === "}") pos++; // skip closing }
-
-    var tokens = content.split(/\s+/).filter(Boolean);
-    var hasSAN = false;
-    for (var i = 0; i < tokens.length; i++) {
-      var core = tokens[i].replace(/[!?+#]+$/g, "");
-      if (isSANCore(core)) {
-        hasSAN = true;
-        break;
-      }
+      const movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
+      return { headerLines, movetext };
     }
 
-    // ========= INLINE COMMENT (no SAN inside) =========
-    if (!hasSAN) {
-      // Ensure same paragraph as current context
-      ensureParagraph(
-        outerCtx,
-        wrapper,
-        outerCtx.type === "main" ? "pgn-mainline" : "pgn-variation"
+    buildFromElement() {
+      const raw = this.sourceEl.textContent.trim();
+      const { headerLines, movetext } = PGNGameView.splitHeadersAndMovetext(raw);
+
+      const cleanedPGN =
+        (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + movetext;
+
+      const game = new Chess();
+      game.load_pgn(cleanedPGN, { sloppy: true });
+      const headers = game.header();
+      const result = normalizeResult(headers.Result || "");
+
+      this.createHeader(headers);
+      this.createMainBoard();
+      this.buildMovetextDOM(
+        movetext + (result ? " " + result : "")
       );
 
-      // Split by [D] markers so we can drop diagrams at correct spots
-      var parts = content.split("[D]");
-      for (var pIndex = 0; pIndex < parts.length; pIndex++) {
-        var textPart = parts[pIndex].trim();
-        if (textPart) {
-          // prepend space so it reads "... Na3 de düşünülebilemezdi."
-          appendText(outerCtx.container, " " + textPart);
-        }
-        // If not the last part, there was a [D] here
-        if (pIndex < parts.length - 1) {
-          createDiagram(wrapper, outerCtx.chess.fen());
-        }
-      }
-      // Inline comment does NOT count as interruption for numbering
-      return pos;
+      this.sourceEl.replaceWith(this.wrapper);
     }
 
-    // ========= BLOCK COMMENT (with SAN) =========
-    // Use separate Chess for FEN, but do NOT print any move numbers here
-    var commentChess = new Chess(outerCtx.chess.fen());
-    var p = document.createElement("p");
-    p.className = "pgn-comment";
-    wrapper.appendChild(p);
+    createHeader(headers) {
+      const white =
+        (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
+        flipName(headers.White || "") +
+        (headers.WhiteElo ? " (" + headers.WhiteElo + ")" : "");
 
-    // Tokenize content again but with simple rules
-    var idx = 0;
-    var len = content.length;
-    while (idx < len) {
-      var ch = content[idx];
+      const black =
+        (headers.BlackTitle ? headers.BlackTitle + " " : "") +
+        flipName(headers.Black || "") +
+        (headers.BlackElo ? " (" + headers.BlackElo + ")" : "");
 
-      if (/\s/.test(ch)) {
-        while (idx < len && /\s/.test(content[idx])) idx++;
-        appendText(p, " ");
-        continue;
+      const year = extractYear(headers.Date);
+      const eventLine = (headers.Event || "") + (year ? ", " + year : "");
+
+      const h3 = document.createElement("h3");
+      const titleLine = `${white} \u2013 ${black}`; // en dash
+
+      h3.appendChild(document.createTextNode(titleLine));
+      h3.appendChild(document.createElement("br"));
+      h3.appendChild(document.createTextNode(eventLine));
+      this.wrapper.appendChild(h3);
+    }
+
+    createMainBoard() {
+      if (typeof Chessboard === "undefined") {
+        return;
+      }
+      const boardDiv = document.createElement("div");
+      boardDiv.className = "pgn-main-board";
+      boardDiv.style.width = "340px";
+      boardDiv.style.maxWidth = "100%";
+
+      // Insert board at the top of the block (just after the header)
+      const refNode = this.wrapper.querySelector("h3");
+      if (refNode && refNode.nextSibling) {
+        this.wrapper.insertBefore(boardDiv, refNode.nextSibling);
+      } else {
+        this.wrapper.appendChild(boardDiv);
       }
 
-      var startTok = idx;
-      while (idx < len && !/\s/.test(content[idx])) idx++;
-      var token = content.substring(startTok, idx);
-      if (!token) continue;
+      this.board = Chessboard(boardDiv, {
+        position: "start",
+        draggable: false,
+        pieceTheme: PIECE_THEME_URL,
+        // simple animation config (chessboard.js v1)
+        moveSpeed: 200,
+        snapSpeed: 100,
+        snapbackSpeed: 100
+      });
+    }
 
-      if (token === "[D]") {
-        createDiagram(wrapper, commentChess.fen());
-        // After diagram in a block comment, start a new comment paragraph
-        p = document.createElement("p");
-        p.className = "pgn-comment";
-        wrapper.appendChild(p);
-        continue;
+    ensureParagraph(ctx, className) {
+      if (!ctx.container) {
+        const p = document.createElement("p");
+        p.className = className;
+        this.wrapper.appendChild(p);
+        ctx.container = p;
       }
+    }
 
-      (function () {
-        var core = token.replace(/[!?+#]+$/g, "");
-        if (!isSANCore(core)) {
-          appendText(p, token + " ");
-          return;
+    handleSANToken(displayToken, ctx) {
+      const core = displayToken.replace(/[!?+#]+$/g, "");
+      if (!PGNGameView.isSANCore(core)) return null;
+
+      const ply = ctx.chess.history().length; // half-move count so far
+      const isWhite = ply % 2 === 0;
+      const moveNumber = Math.floor(ply / 2) + 1;
+
+      if (isWhite) {
+        // White move: always print "N."
+        appendText(ctx.container, moveNumber + ". ");
+        ctx.lastWasInterrupt = false;
+      } else {
+        // Black: only print "N..." if there was an interruption
+        if (ctx.lastWasInterrupt) {
+          appendText(ctx.container, moveNumber + "... ");
         }
-        var mv = commentChess.move(core, { sloppy: true });
+        ctx.lastWasInterrupt = false;
+      }
+
+      const mv = ctx.chess.move(core, { sloppy: true });
+      if (!mv) {
+        appendText(ctx.container, displayToken + " ");
+        return null;
+      }
+
+      const span = document.createElement("span");
+      span.className = "pgn-move sticky-move";
+      span.dataset.fen = ctx.chess.fen();
+      span.textContent = displayToken + " ";
+
+      ctx.container.appendChild(span);
+      return span;
+    }
+
+    parseComment(movetext, pos, outerCtx) {
+      const n = movetext.length;
+      let idx = pos;
+
+      // Read full comment content up to closing brace
+      while (idx < n && movetext[idx] !== "}") idx++;
+      const content = movetext.substring(pos, idx);
+      if (idx < n && movetext[idx] === "}") idx++; // skip closing }
+
+      const tokens = content.split(/\s+/).filter(Boolean);
+      let hasSAN = false;
+      for (let i = 0; i < tokens.length; i++) {
+        const core = tokens[i].replace(/[!?+#]+$/g, "");
+        if (PGNGameView.isSANCore(core)) {
+          hasSAN = true;
+          break;
+        }
+      }
+
+      // ========= INLINE COMMENT (no SAN inside) =========
+      if (!hasSAN) {
+        this.ensureParagraph(
+          outerCtx,
+          outerCtx.type === "main" ? "pgn-mainline" : "pgn-variation"
+        );
+
+        // Split by [D] markers so we can drop diagrams at correct spots
+        const parts = content.split("[D]");
+        for (let pIndex = 0; pIndex < parts.length; pIndex++) {
+          const textPart = parts[pIndex].trim();
+          if (textPart) {
+            // prepend space so it reads "... Na3 de düşünülebilemezdi."
+            appendText(outerCtx.container, " " + textPart);
+          }
+          // If not the last part, there was a [D] here
+          if (pIndex < parts.length - 1) {
+            createDiagram(this.wrapper, outerCtx.chess.fen());
+          }
+        }
+        // Inline comment does NOT count as interruption for numbering
+        return idx;
+      }
+
+      // ========= BLOCK COMMENT (with SAN) =========
+      // Use separate Chess for FEN, but do NOT print any move numbers here
+      const commentChess = new Chess(outerCtx.chess.fen());
+      let p = document.createElement("p");
+      p.className = "pgn-comment";
+      this.wrapper.appendChild(p);
+
+      let cIdx = 0;
+      const len = content.length;
+      while (cIdx < len) {
+        const ch = content[cIdx];
+
+        if (/\s/.test(ch)) {
+          while (cIdx < len && /\s/.test(content[cIdx])) cIdx++;
+          appendText(p, " ");
+          continue;
+        }
+
+        const startTok = cIdx;
+        while (cIdx < len && !/\s/.test(content[cIdx])) cIdx++;
+        const token = content.substring(startTok, cIdx);
+        if (!token) continue;
+
+        if (token === "[D]") {
+          createDiagram(this.wrapper, commentChess.fen());
+          // After diagram in a block comment, start a new comment paragraph
+          p = document.createElement("p");
+          p.className = "pgn-comment";
+          this.wrapper.appendChild(p);
+          continue;
+        }
+
+        const core = token.replace(/[!?+#]+$/g, "");
+        if (!PGNGameView.isSANCore(core)) {
+          appendText(p, token + " ");
+          continue;
+        }
+        const mv = commentChess.move(core, { sloppy: true });
         if (!mv) {
           appendText(p, token + " ");
-          return;
+          continue;
         }
-        var span = document.createElement("span");
+        const span = document.createElement("span");
         span.className = "pgn-move sticky-move";
         span.dataset.fen = commentChess.fen();
         span.textContent = token + " ";
         p.appendChild(span);
-      })();
+      }
+
+      // Block comments DO count as interruption
+      outerCtx.lastWasInterrupt = true;
+      // next text in outer context should go to a fresh paragraph
+      outerCtx.container = null;
+
+      return idx;
     }
 
-    // Block comments DO count as interruption
-    outerCtx.lastWasInterrupt = true;
-    // next text in outer context should go to a fresh paragraph
-    outerCtx.container = null;
+    buildMovetextDOM(movetext) {
+      const mainChess = new Chess();
 
-    return pos;
-  }
+      const rootCtx = {
+        type: "main",
+        chess: mainChess,
+        container: null,
+        parent: null,
+        lastWasInterrupt: false
+      };
+      let ctx = rootCtx;
 
-  function buildMovetextDOM(movetext, wrapper) {
-    var mainChess = new Chess();
+      let i = 0;
+      const n = movetext.length;
 
-    var rootCtx = {
-      type: "main",
-      chess: mainChess,
-      container: null,
-      parent: null,
-      lastWasInterrupt: false
-    };
-    var ctx = rootCtx;
-
-    var i = 0;
-    var n = movetext.length;
-
-    while (i < n) {
-      var ch = movetext[i];
-
-      // Whitespace
-      if (/\s/.test(ch)) {
-        while (i < n && /\s/.test(movetext[i])) i++;
-        ensureParagraph(
-          ctx,
-          wrapper,
-          ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-        );
-        appendText(ctx.container, " ");
-        continue;
-      }
-
-      // Start variation
-      if (ch === "(") {
-        i++;
-        ctx.lastWasInterrupt = true;
-
-        var varChess = new Chess(ctx.chess.fen());
-        var varCtx = {
-          type: "variation",
-          chess: varChess,
-          container: null,
-          parent: ctx,
-          lastWasInterrupt: false
-        };
-        ctx = varCtx;
-        ensureParagraph(ctx, wrapper, "pgn-variation");
-        continue;
-      }
-
-      // End variation
-      if (ch === ")") {
-        i++;
-        if (ctx.parent) {
-          ctx = ctx.parent;
-          ctx.lastWasInterrupt = true; // returning from var = interruption
-          ctx.container = null; // next text in parent starts fresh paragraph
-        }
-        continue;
-      }
-
-      // Comment
-      if (ch === "{") {
-        i = parseComment(movetext, i + 1, ctx, wrapper);
-        continue;
-      }
-
-      // Normal token
-      var start = i;
       while (i < n) {
-        var c2 = movetext[i];
-        if (/\s/.test(c2) || c2 === "(" || c2 === ")" || c2 === "{" || c2 === "}") break;
-        i++;
-      }
-      var token = movetext.substring(start, i);
-      if (!token) continue;
+        const ch = movetext[i];
 
-      // Diagram marker
-      if (token === "[D]") {
-        createDiagram(wrapper, ctx.chess.fen());
-        ctx.lastWasInterrupt = true;
-        ctx.container = null;
-        continue;
-      }
+        // Whitespace
+        if (/\s/.test(ch)) {
+          while (i < n && /\s/.test(movetext[i])) i++;
+          this.ensureParagraph(
+            ctx,
+            ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+          );
+          appendText(ctx.container, " ");
+          continue;
+        }
 
-      // Game result (1-0, ½-½, etc.)
-      if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(token)) {
-        ensureParagraph(
+        // Start variation
+        if (ch === "(") {
+          i++;
+          ctx.lastWasInterrupt = true;
+
+          const varChess = new Chess(ctx.chess.fen());
+          const varCtx = {
+            type: "variation",
+            chess: varChess,
+            container: null,
+            parent: ctx,
+            lastWasInterrupt: false
+          };
+          ctx = varCtx;
+          this.ensureParagraph(ctx, "pgn-variation");
+          continue;
+        }
+
+        // End variation
+        if (ch === ")") {
+          i++;
+          if (ctx.parent) {
+            ctx = ctx.parent;
+            ctx.lastWasInterrupt = true; // returning from var = interruption
+            ctx.container = null; // next text in parent starts fresh paragraph
+          }
+          continue;
+        }
+
+        // Comment
+        if (ch === "{") {
+          i = this.parseComment(movetext, i + 1, ctx);
+          continue;
+        }
+
+        // Normal token
+        const start = i;
+        while (i < n) {
+          const c2 = movetext[i];
+          if (
+            /\s/.test(c2) ||
+            c2 === "(" ||
+            c2 === ")" ||
+            c2 === "{" ||
+            c2 === "}"
+          )
+            break;
+          i++;
+        }
+        const token = movetext.substring(start, i);
+        if (!token) continue;
+
+        // Diagram marker
+        if (token === "[D]") {
+          createDiagram(this.wrapper, ctx.chess.fen());
+          ctx.lastWasInterrupt = true;
+          ctx.container = null;
+          continue;
+        }
+
+        // Game result (1-0, ½-½, etc.)
+        if (RESULT_REGEX.test(token)) {
+          this.ensureParagraph(
+            ctx,
+            ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
+          );
+          appendText(ctx.container, token + " ");
+          continue;
+        }
+
+        // IGNORE literal PGN move numbers like "1.", "23."
+        if (MOVE_NUMBER_REGEX.test(token)) {
+          continue;
+        }
+
+        // SAN move
+        this.ensureParagraph(
           ctx,
-          wrapper,
           ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
         );
-        appendText(ctx.container, token + " ");
-        continue;
+        const sanSpan = this.handleSANToken(token, ctx);
+        if (!sanSpan) {
+          appendText(ctx.container, token + " ");
+        }
+      }
+    }
+
+    syncBoardToFEN(fen, span) {
+      if (!this.board) return;
+      this.board.position(fen, true); // use animation
+
+      if (this.activeMoveSpan) {
+        this.activeMoveSpan.classList.remove("pgn-move--active");
+      }
+      if (span) {
+        span.classList.add("pgn-move--active");
+        this.activeMoveSpan = span;
+      }
+    }
+
+    attachMoveClickHandler() {
+      this.wrapper.addEventListener("click", (evt) => {
+        const target = evt.target.closest(".pgn-move");
+        if (!target || !this.wrapper.contains(target)) return;
+        const fen = target.dataset.fen;
+        if (!fen) return;
+        this.syncBoardToFEN(fen, target);
+      });
+    }
+
+    applyFigurines() {
+      // Prefer external figurine library if available
+      if (window.ChessFigurine && typeof window.ChessFigurine.run === "function") {
+        window.ChessFigurine.run(this.wrapper);
+        return;
       }
 
-      // IGNORE literal PGN move numbers like "1.", "23."
-      if (/^\d+\.+$/.test(token)) {
-        continue;
-      }
+      // Fallback: basic SAN -> figurine replacement for initial piece letter
+      const map = {
+        K: "♔",
+        Q: "♕",
+        R: "♖",
+        B: "♗",
+        N: "♘"
+      };
 
-      // SAN move
-      ensureParagraph(
-        ctx,
-        wrapper,
-        ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-      );
-      var sanSpan = handleSANToken(token, ctx);
-      if (!sanSpan) {
-        appendText(ctx.container, token + " ");
-      }
+      const moveSpans = this.wrapper.querySelectorAll(".pgn-move");
+      moveSpans.forEach((span) => {
+        const text = span.textContent;
+        // Keep trailing whitespace
+        const match = text.match(/^([KQRBN])(.+?)(\s*)$/);
+        if (!match) return;
+        const [, letter, rest, ws] = match;
+        const fig = map[letter];
+        if (!fig) return;
+        span.textContent = fig + rest + (ws || "");
+      });
     }
   }
 
-  function renderPGNElement(el) {
-    if (!ensureDeps()) return;
-
-    var raw = el.textContent.trim();
-    var lines = raw.split(/\r?\n/);
-
-    var headerLines = [];
-    var movetextLines = [];
-    var inHeader = true;
-
-    lines.forEach(function (line) {
-      var t = line.trim();
-      if (inHeader && t.startsWith("[") && t.endsWith("]")) {
-        headerLines.push(line);
-      } else if (inHeader && t === "") {
-        inHeader = false;
-      } else {
-        inHeader = false;
-        movetextLines.push(line);
-      }
-    });
-
-    var movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
-    var cleanedPGN =
-      (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + movetext;
-
-    var game = new Chess();
-    game.load_pgn(cleanedPGN, { sloppy: true });
-
-    var headers = game.header();
-    var result = normalizeResult(headers.Result || "");
-
-    var wrapper = document.createElement("div");
-    wrapper.className = "pgn-blog-block";
-
-    var white =
-      (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
-      flipName(headers.White || "") +
-      (headers.WhiteElo ? " (" + headers.WhiteElo + ")" : "");
-
-    var black =
-      (headers.BlackTitle ? headers.BlackTitle + " " : "") +
-      flipName(headers.Black || "") +
-      (headers.BlackElo ? " (" + headers.BlackElo + ")" : "");
-
-    var year = extractYear(headers.Date);
-    var eventLine = (headers.Event || "") + (year ? ", " + year : "");
-
-    var h3 = document.createElement("h3");
-    h3.innerHTML = white + " – " + black + "<br>" + eventLine;
-    wrapper.appendChild(h3);
-
-    buildMovetextDOM(movetext + (result ? " " + result : ""), wrapper);
-
-    el.replaceWith(wrapper);
-
-    if (window.ChessFigurine && window.ChessFigurine.run) {
-      ChessFigurine.run(wrapper);
+  class PGNRenderer {
+    static renderAll(root) {
+      const scope = root || document;
+      const elements = scope.querySelectorAll("pgn");
+      elements.forEach((el) => new PGNGameView(el));
     }
-  }
 
-  function renderAll(root) {
-    (root || document).querySelectorAll("pgn").forEach(function (el) {
-      renderPGNElement(el);
-    });
-  }
+    static init() {
+      if (!ensureDeps()) return;
 
-  function init() {
-    renderAll(document);
-    window.PGNRenderer = {
-      run: function (root) {
-        renderAll(root || document.body);
-      }
-    };
+      PGNRenderer.renderAll(document);
+
+      // public API
+      window.PGNRenderer = {
+        run(root) {
+          PGNRenderer.renderAll(root || document.body);
+        }
+      };
+    }
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", () => {
+      PGNRenderer.init();
+    });
   } else {
-    init();
+    PGNRenderer.init();
   }
 })();
