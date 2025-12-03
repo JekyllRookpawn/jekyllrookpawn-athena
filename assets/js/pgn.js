@@ -5,10 +5,12 @@
   const PIECE_THEME_URL =
     "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
 
+  // Allow both O-O and 0-0 / 0-0-0 as castling
   const SAN_CORE_REGEX =
-    /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/;
+    /^([O0]-[O0](-[O0])?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/;
+
   const RESULT_REGEX = /^(1-0|0-1|1\/2-1\/2|½-½|\*)$/;
-  const MOVE_NUMBER_REGEX = /^(\d+)(\.+)$/;
+  const MOVE_NUMBER_REGEX = /^(\d+)(\.+)$/; // e.g. 4. or 4...
 
   let diagramCounter = 0;
 
@@ -119,7 +121,6 @@
       const cleanedPGN =
         (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + movetext;
 
-      // Use chess.js only to parse headers and result
       const game = new Chess();
       game.load_pgn(cleanedPGN, { sloppy: true });
       const headers = game.header();
@@ -166,20 +167,12 @@
     // --- move handling ---
 
     handleSANToken(displayToken, ctx) {
-      // Strip trailing non-SAN characters (e.g. "+-", "!?")
-      const core = displayToken.replace(/[^a-hKQRBN0-9=]+$/g, "");
+      // Strip trailing non-SAN characters (e.g. "+-", "?!", "!!")
+      const core = displayToken.replace(/[^a-hKQRBN0-9=O0-]+$/g, "");
       if (!PGNGameView.isSANCore(core)) return null;
 
-      if (ctx.type === "variation") {
-        // In variations, respect explicit PGN numbers like "4..." / "5."
-        if (ctx.pendingNumber != null) {
-          const dots = ctx.pendingDots === 3 ? "... " : ". ";
-          appendText(ctx.container, ctx.pendingNumber + dots);
-          ctx.pendingNumber = null;
-          ctx.pendingDots = null;
-        }
-      } else {
-        // Mainline: auto numbering
+      // MAINLINE: auto numbering
+      if (ctx.type === "main") {
         const ply = ctx.chess.history().length; // half-move count so far
         const isWhite = ply % 2 === 0;
         const moveNumber = Math.floor(ply / 2) + 1;
@@ -194,6 +187,7 @@
           ctx.lastWasInterrupt = false;
         }
       }
+      // VARIATION: we do NOT touch numbering here; we keep PGN's "4...", "5." tokens as literal text.
 
       const mv = ctx.chess.move(core, { sloppy: true });
       if (!mv) {
@@ -224,7 +218,7 @@
       const tokens = content.split(/\s+/).filter(Boolean);
       let hasSAN = false;
       for (let i = 0; i < tokens.length; i++) {
-        const core = tokens[i].replace(/[^a-hKQRBN0-9=]+$/g, "");
+        const core = tokens[i].replace(/[^a-hKQRBN0-9=O0-]+$/g, "");
         if (PGNGameView.isSANCore(core)) {
           hasSAN = true;
           break;
@@ -282,7 +276,7 @@
           continue;
         }
 
-        const core = token.replace(/[^a-hKQRBN0-9=]+$/g, "");
+        const core = token.replace(/[^a-hKQRBN0-9=O0-]+$/g, "");
         if (!PGNGameView.isSANCore(core)) {
           appendText(p, token + " ");
           continue;
@@ -317,9 +311,7 @@
         chess: mainChess,
         container: null,
         parent: null,
-        lastWasInterrupt: false,
-        pendingNumber: null,
-        pendingDots: null
+        lastWasInterrupt: false
       };
       let ctx = rootCtx;
 
@@ -351,9 +343,7 @@
             chess: varChess,
             container: null,
             parent: ctx,
-            lastWasInterrupt: false,
-            pendingNumber: null,
-            pendingDots: null
+            lastWasInterrupt: false
           };
           ctx = varCtx;
           this.ensureParagraph(ctx, "pgn-variation");
@@ -410,9 +400,15 @@
         // Move numbers like "4." or "4..."
         const m = token.match(MOVE_NUMBER_REGEX);
         if (m) {
-          ctx.pendingNumber = parseInt(m[1], 10);
-          ctx.pendingDots = m[2].length; // 1 for ".", 3 for "..."
-          continue;
+          if (ctx.type === "main") {
+            // In mainline we ignore literal move numbers (we re-generate them)
+            continue;
+          } else {
+            // In variations, we KEEP the literal move number as text
+            this.ensureParagraph(ctx, "pgn-variation");
+            appendText(ctx.container, token + " ");
+            continue;
+          }
         }
 
         // SAN move
